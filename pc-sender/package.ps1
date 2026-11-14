@@ -8,12 +8,12 @@ if ($javacCommand) { $jdkCandidates += (Split-Path -Parent $javacCommand.Source)
 $jdkCandidates += 'C:\Program Files\Java\jdk-21\bin'
 $jdk = $jdkCandidates | Where-Object { (Test-Path (Join-Path $_ 'javac.exe')) -and (Test-Path (Join-Path $_ 'jpackage.exe')) } | Select-Object -First 1
 if (-not $jdk) { throw 'Instala JDK 21 y configura JAVA_HOME o agrega jpackage.exe al PATH.' }
-$dist = Join-Path $project 'release-v1.7'
+$dist = Join-Path $project 'release-v1.8'
 $packageInput = Join-Path $project 'build\package-input'
-$compatibilityDist = Join-Path $project 'build\dist-v1.7'
+$compatibilityDist = Join-Path $project 'build\dist-v1.8'
 if (Test-Path $dist) {
   $resolvedDist = (Resolve-Path $dist).Path.TrimEnd('\')
-  if ($resolvedDist -ne (Join-Path $project 'release-v1.7')) { throw "Carpeta de distribución inesperada: $resolvedDist" }
+  if ($resolvedDist -ne (Join-Path $project 'release-v1.8')) { throw "Carpeta de distribución inesperada: $resolvedDist" }
   Remove-Item -LiteralPath $dist -Recurse -Force
 }
 if (Test-Path $packageInput) {
@@ -23,12 +23,12 @@ if (Test-Path $packageInput) {
 }
 New-Item -ItemType Directory -Force $dist, $packageInput | Out-Null
 Copy-Item (Join-Path $project 'build\ProyectorSender.jar') (Join-Path $packageInput 'ProyectorSender.jar')
-& (Join-Path $jdk 'jpackage.exe') --type app-image --name ProyectorSender --input $packageInput --main-jar ProyectorSender.jar --main-class com.proyector.sender.Main --dest $dist --app-version 1.7.0 --vendor 'Proyector local'
+& (Join-Path $jdk 'jpackage.exe') --type app-image --name ProyectorSender --input $packageInput --main-jar ProyectorSender.jar --main-class com.proyector.sender.Main --dest $dist --app-version 1.8.0 --vendor 'Proyector local'
 if ($LASTEXITCODE -ne 0) { throw 'jpackage no pudo crear la aplicación de Windows' }
 if (-not (Test-Path (Join-Path $dist 'ProyectorSender\app\ProyectorSender.jar'))) { throw 'El paquete de Windows quedó incompleto: no incluye el programa principal.' }
 if (Test-Path $compatibilityDist) {
   $resolvedCompatibility = (Resolve-Path $compatibilityDist).Path.TrimEnd('\')
-  if ($resolvedCompatibility -ne (Join-Path $project 'build\dist-v1.7')) { throw "Carpeta de compatibilidad inesperada: $resolvedCompatibility" }
+  if ($resolvedCompatibility -ne (Join-Path $project 'build\dist-v1.8')) { throw "Carpeta de compatibilidad inesperada: $resolvedCompatibility" }
   Remove-Item -LiteralPath $compatibilityDist -Recurse -Force
 }
 New-Item -ItemType Directory -Force $compatibilityDist | Out-Null

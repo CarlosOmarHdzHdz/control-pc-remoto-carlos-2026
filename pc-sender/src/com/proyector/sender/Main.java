@@ -706,7 +706,7 @@ public final class Main {
         }
 
         static void queryVolume(BiConsumer<Boolean, String> result) {
-            audioAction("get", result);
+            audioAction("status", result);
         }
 
         static void setVolume(int percent, BiConsumer<Boolean, String> result) {
@@ -739,10 +739,15 @@ public final class Main {
                         result.accept(false, "Windows no pudo leer el volumen. Comprueba que haya un dispositivo de audio activo.");
                         return;
                     }
-                    String[] parts = response.split("\\|");
-                    int percent = Integer.parseInt(parts[0]);
-                    boolean muted = parts.length > 1 && "1".equals(parts[1]);
-                    result.accept(true, "VOL:" + percent + ":" + (muted ? "1" : "0"));
+                    if ("status".equals(action)) {
+                        if (!response.startsWith("STAT:")) throw new IOException("Estado de Windows no válido");
+                        result.accept(true, response);
+                    } else {
+                        String[] parts = response.split("\\|");
+                        int percent = Integer.parseInt(parts[0]);
+                        boolean muted = parts.length > 1 && "1".equals(parts[1]);
+                        result.accept(true, "VOL:" + percent + ":" + (muted ? "1" : "0"));
+                    }
                 } catch (Exception error) {
                     result.accept(false, "No se pudo controlar el volumen de Windows. Revisa el dispositivo de audio.");
                 }
@@ -804,10 +809,19 @@ public final class Main {
                     "return ((int)Math.Round(scalar * 100)).ToString(CultureInfo.InvariantCulture) + \"|\" + (muted ? \"1\" : \"0\");",
                     "}",
                     "}");
-            return "$ErrorActionPreference = 'Stop'\n"
+            String audioCommand = "status".equals(action) ? "get" : action;
+            String script = "$ErrorActionPreference = 'Stop'\n"
                     + "$source = @'\n" + csharp + "\n'@\n"
-                    + "try { Add-Type -TypeDefinition $source -ErrorAction Stop; [Console]::WriteLine([CoreAudioBridge]::Run('" + action + "')) } "
-                    + "catch { [Console]::Error.WriteLine($_.Exception.Message); exit 3 }";
+                    + "try { Add-Type -TypeDefinition $source -ErrorAction Stop; $audio = [CoreAudioBridge]::Run('" + audioCommand + "'); ";
+            if ("status".equals(action)) {
+                script += "$parts = $audio.Split('|'); $battery = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1; "
+                        + "$batteryPercent = 'NA'; $charging = 0; if ($null -ne $battery) { if ($null -ne $battery.EstimatedChargeRemaining) { $batteryPercent = [string][int]$battery.EstimatedChargeRemaining }; "
+                        + "$state = [int]$battery.BatteryStatus; if ($state -eq 6 -or $state -eq 7 -or $state -eq 8 -or $state -eq 9) { $charging = 1 } }; "
+                        + "[Console]::WriteLine('STAT:' + $parts[0] + ':' + $parts[1] + ':' + $batteryPercent + ':' + $charging) } ";
+            } else {
+                script += "[Console]::WriteLine($audio) } ";
+            }
+            return script + "catch { [Console]::Error.WriteLine($_.Exception.Message); exit 3 }";
         }
 
         private static void report(StatusListener status, BiConsumer<Boolean, String> result, boolean success, String message) {

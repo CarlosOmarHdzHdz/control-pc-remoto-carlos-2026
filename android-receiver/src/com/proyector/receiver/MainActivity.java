@@ -87,6 +87,7 @@ public final class MainActivity extends Activity {
     private TextView deviceStatus;
     private TextView commandResultText;
     private TextView batteryText;
+    private TextView pcBatteryText;
     private TextView networkModeHint;
     private TextView volumeLevelText;
     private SeekBar volumeSeekBar;
@@ -173,7 +174,7 @@ public final class MainActivity extends Activity {
         int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
         if (level < 0 || scale <= 0) return;
         int percent = Math.max(0, Math.min(100, Math.round(level * 100f / scale)));
-        batteryText.setText(percent + "%");
+        batteryText.setText("TEL " + percent + "%");
         batteryText.setTextColor(percent <= 15 ? Color.rgb(255, 176, 132) : COLOR_TEXT);
         batteryText.setContentDescription("Batería del teléfono: " + percent + "%");
     }
@@ -201,10 +202,10 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, -2, 1);
         titleParams.leftMargin = dp(12);
         header.addView(appTitle, titleParams);
-        batteryText = text("--%", 10, COLOR_TEXT, true);
+        batteryText = text("TEL --%", 10, COLOR_TEXT, true);
         batteryText.setPadding(dp(9), dp(7), dp(9), dp(7));
         batteryText.setBackground(rounded(Color.rgb(22, 57, 101), dp(12), COLOR_BORDER, dp(1)));
-        batteryText.setContentDescription("Batería del dispositivo");
+        batteryText.setContentDescription("Batería del teléfono");
         header.addView(batteryText);
         TextView local = text("LAN · VPN", 10, COLOR_ACCENT, true);
         local.setPadding(dp(10), dp(7), dp(10), dp(7));
@@ -276,6 +277,8 @@ public final class MainActivity extends Activity {
         deviceCard.addView(deviceRow);
         deviceStatus = text("●  Buscando PC en la red local", 13, COLOR_MUTED, false);
         addSpaced(deviceCard, deviceStatus, 12);
+        pcBatteryText = text("Batería de Windows · esperando conexión", 12, COLOR_MUTED, false);
+        addSpaced(deviceCard, pcBatteryText, 8);
         Button openConnection = button("Conectar o cambiar equipo", COLOR_CARD_RAISED, COLOR_TEXT);
         addSpaced(deviceCard, openConnection, 14);
         openConnection.setOnClickListener(view -> showPage(3));
@@ -1019,6 +1022,7 @@ public final class MainActivity extends Activity {
                     });
                     setStatus("Conectado · recibiendo pantalla", false);
                     sendPacket(15);
+                    long nextStatusRefresh = System.currentTimeMillis() + 30000;
                     while (alive && connected == activeSocket) {
                         int length;
                         try { length = input.readInt(); }
@@ -1044,6 +1048,10 @@ public final class MainActivity extends Activity {
                             });
                             else framePending.set(false);
                         }
+                        if (System.currentTimeMillis() >= nextStatusRefresh) {
+                            sendPacket(15);
+                            nextStatusRefresh = System.currentTimeMillis() + 30000;
+                        }
                     }
                 } catch (Exception error) {
                     if (alive && connected == activeSocket) setStatus("Conexión perdida. Buscando otra vez…", true);
@@ -1056,6 +1064,7 @@ public final class MainActivity extends Activity {
                         deviceStatus.setTextColor(COLOR_MUTED);
                         if (volumeSeekBar != null) volumeSeekBar.setEnabled(false);
                         if (volumeLevelText != null) volumeLevelText.setText("Volumen de Windows · sin conexión");
+                        if (pcBatteryText != null) pcBatteryText.setText("Batería de Windows · sin conexión");
                     });
                     try { connected.close(); } catch (IOException ignored) { }
                     if (connected == activeSocket) activeSocket = null;
@@ -1087,7 +1096,29 @@ public final class MainActivity extends Activity {
     private void showCommandResult(String message, boolean success) {
         mainHandler.post(() -> {
             String displayMessage = message;
-            if (message != null && message.startsWith("VOL:")) {
+            if (message != null && message.startsWith("STAT:")) {
+                try {
+                    String[] parts = message.split(":");
+                    if (parts.length < 5) throw new IllegalArgumentException("Estado incompleto");
+                    int percent = Math.max(0, Math.min(100, Integer.parseInt(parts[1])));
+                    boolean muted = "1".equals(parts[2]);
+                    updatingVolumeFromPc = true;
+                    if (volumeSeekBar != null) volumeSeekBar.setProgress(percent);
+                    if (volumeLevelText != null) volumeLevelText.setText("Volumen de Windows: " + percent + "%" + (muted ? " · silenciado" : ""));
+                    updatingVolumeFromPc = false;
+                    String batteryStatus;
+                    if ("NA".equals(parts[3])) {
+                        batteryStatus = "sin batería detectada";
+                        if (pcBatteryText != null) pcBatteryText.setText("Batería de Windows · no detectada");
+                    } else {
+                        int battery = Math.max(0, Math.min(100, Integer.parseInt(parts[3])));
+                        boolean charging = "1".equals(parts[4]);
+                        batteryStatus = "batería " + battery + "%" + (charging ? " · cargando" : "");
+                        if (pcBatteryText != null) pcBatteryText.setText("Batería de Windows: " + battery + "%" + (charging ? " · cargando" : ""));
+                    }
+                    displayMessage = "Volumen " + percent + "%" + (muted ? " · silenciado" : "") + " · " + batteryStatus;
+                } catch (RuntimeException ignored) { updatingVolumeFromPc = false; }
+            } else if (message != null && message.startsWith("VOL:")) {
                 try {
                     String[] parts = message.split(":");
                     int percent = Math.max(0, Math.min(100, Integer.parseInt(parts[1])));

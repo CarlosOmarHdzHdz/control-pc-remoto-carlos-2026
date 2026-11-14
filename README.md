@@ -31,7 +31,7 @@ Tailscale conecta los dispositivos como si compartieran una red privada y cifra 
 
 - Ver el escritorio completo, interacción táctil y panel táctil.
 - Bloquear, suspender, apagar, reiniciar y ajustar el volumen de Windows.
-- Muestra la batería del Android y el porcentaje real de volumen de Windows. El control deslizante fija el volumen; los botones lo cambian en pasos de 5 %.
+- Muestra el porcentaje de batería de Windows y del Android, y el volumen real de Windows. El control deslizante fija el volumen; los botones lo cambian en pasos de 5 %.
 - Ajustes de imagen de 360p, 540p, 720p y Full HD 1080p; FPS seleccionables hasta 60. Para reducir latencia en redes lentas, empieza con **360p/540p y 15–24 FPS**. 1080p/60 depende de la captura, CPU, Wi‑Fi y teléfono; no se puede garantizar ese ritmo en cualquier equipo.
 - La captura usa una imagen JPEG por fotograma y CPU; no usa codificación de vídeo por hardware. En esta versión se redujo la captura adicional de alta resolución para evitar trabajo que no mejora la imagen final y añade demora.
 

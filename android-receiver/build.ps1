@@ -36,7 +36,7 @@ $unsigned = Join-Path $out 'receiver-unsigned.apk'
 $compiledResources = Join-Path $out 'resources.zip'
 & (Join-Path $buildTools 'aapt2.exe') compile --dir (Join-Path $project 'res') -o $compiledResources
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo compilar el icono' }
-& (Join-Path $buildTools 'aapt2.exe') link -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --min-sdk-version 23 --target-sdk-version 35 --version-code 8 --version-name 1.7 -o $unsigned
+& (Join-Path $buildTools 'aapt2.exe') link -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --min-sdk-version 23 --target-sdk-version 35 --version-code 9 --version-name 1.8 -o $unsigned
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo crear el APK base' }
 
 $source = Join-Path $project 'src\com\proyector\receiver\MainActivity.java'
