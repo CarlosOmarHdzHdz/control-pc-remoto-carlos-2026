@@ -1,0 +1,5 @@
+# Generated APKs, jars, native package bundles and local signing keys
+**/build/
+pc-sender/release*/
+previews/
+release-assets/
