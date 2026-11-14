@@ -4,10 +4,11 @@ Aplicación Android y emisor para Windows para ver y controlar el escritorio com
 
 ## Descargas
 
-Los instaladores se publican en la sección **Releases** de GitHub:
+Los archivos están en la [versión 1.8](https://github.com/CarlosOmarHdzHdz/proyector-control-pc/releases/tag/v1.8):
 
-- `ProyectorReceiver.apk`: Android 6 o posterior.
-- `ProyectorSender-Windows.zip`: aplicación portable para Windows 10/11. Extrae la carpeta y ejecuta `ProyectorSender.exe`; conserva junto al EXE las carpetas `app` y `runtime`.
+- [`ProyectorReceiver-1.8.apk`](downloads/ProyectorReceiver-1.8.apk): aplicación Android (Android 6 o posterior).
+- [`ProyectorSender-Windows-1.8.zip`](downloads/ProyectorSender-Windows-1.8.zip): aplicación portable para Windows 10/11. Extrae la carpeta y ejecuta `ProyectorSender.exe`; conserva junto al EXE las carpetas `app` y `runtime`.
+- [`SHA256SUMS-1.8.txt`](downloads/SHA256SUMS-1.8.txt): hashes SHA‑256 para verificar que las descargas estén completas.
 
 ## Red local y USB
 
