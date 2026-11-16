@@ -216,7 +216,7 @@ final class ReceiverLink implements AutoCloseable {
                 if (target != desired) continue;
                 if (desired.token.isEmpty() && failures >= 1) {
                     String message = error instanceof SSLException
-                            ? "No se pudo verificar el cifrado. Usa la versión 1.9 en Windows y Android."
+                            ? "No se pudo verificar el cifrado. Actualiza el emisor y el receptor a la misma versión."
                             : "No se pudo llegar a esa PC. Comprueba el emisor, la red y el puerto.";
                     stopAttempt(desired, message);
                     continue;

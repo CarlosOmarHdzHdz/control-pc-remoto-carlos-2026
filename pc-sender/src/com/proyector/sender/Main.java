@@ -29,7 +29,12 @@ public final class Main {
             UIManager.put("ComboBox.selectionBackground", new Color(44, 80, 89));
             UIManager.put("ComboBox.selectionForeground", TEXT);
             UIManager.put("ComboBox.font", new Font("Segoe UI", Font.PLAIN, 13));
-            new SenderWindow().setVisible(true);
+            try { new SenderWindow().setVisible(true); }
+            catch (RuntimeException error) {
+                error.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Windows no pudo abrir el emisor. Comprueba que extrajiste la carpeta completa.",
+                        "Error de inicio de Control de PC", JOptionPane.ERROR_MESSAGE);
+            }
         });
     }
 
@@ -78,8 +83,8 @@ public final class Main {
             twoColumns.setOpaque(false);
             twoColumns.add(pairingCard());
             twoColumns.add(displayCard());
-            add(stack, twoColumns, 0);
-            add(stack, networkCard(), 14);
+            addSpaced(stack, twoColumns, 0);
+            addSpaced(stack, networkCard(), 14);
             JScrollPane scroll = new JScrollPane(stack);
             scroll.setBorder(null);
             scroll.getViewport().setBackground(BACKGROUND);
@@ -112,31 +117,31 @@ public final class Main {
             header.setOpaque(false);
             header.add(new JLabel(new ImageIcon(mark(44))), BorderLayout.WEST);
             JPanel title = column();
-            add(title, label("Control de PC", 25, TEXT, true), 0);
-            add(title, label(computer + "  ·  Emisor de Windows", 13, MUTED, false), 3);
+            addSpaced(title, label("Control de PC", 25, TEXT, true), 0);
+            addSpaced(title, label(computer + "  ·  Emisor de Windows", 13, MUTED, false), 3);
             header.add(title, BorderLayout.CENTER);
             JPanel session = column();
-            add(session, connection, 2);
-            add(session, video, 4);
+            addSpaced(session, connection, 2);
+            addSpaced(session, video, 4);
             header.add(session, BorderLayout.EAST);
             return header;
         }
 
         private JPanel pairingCard() {
             JPanel card = card();
-            add(card, label("Vincular Android", 20, TEXT, true), 0);
-            add(card, label("Abre Conexión en el teléfono y escribe el código.", 12, MUTED, false), 6);
+            addSpaced(card, label("Vincular Android", 20, TEXT, true), 0);
+            addSpaced(card, label("Abre Conexión en el teléfono y escribe el código.", 12, MUTED, false), 6);
             JPanel codeWell = new Surface(WELL, BORDER, 15);
             codeWell.setLayout(new BorderLayout(10, 0));
             codeWell.setBorder(BorderFactory.createEmptyBorder(8, 13, 8, 10));
             pin.setFont(new Font("Consolas", Font.BOLD, 40));
             codeWell.add(pin, BorderLayout.CENTER);
             codeWell.add(copyPin, BorderLayout.EAST);
-            add(card, codeWell, 15);
-            add(card, label("Identidad de este equipo", 12, TEXT, true), 13);
+            addSpaced(card, codeWell, 15);
+            addSpaced(card, label("Identidad de este equipo", 12, TEXT, true), 13);
             identityLabel.setFont(new Font("Consolas", Font.PLAIN, 14));
-            add(card, identityLabel, 4);
-            add(card, label("Compara este texto la primera vez que conectes.", 12, MUTED, false), 4);
+            addSpaced(card, identityLabel, 4);
+            addSpaced(card, label("Compara este texto la primera vez que conectes.", 12, MUTED, false), 4);
 
             JPanel actions = new JPanel(new BorderLayout(10, 0));
             actions.setOpaque(false);
@@ -149,35 +154,35 @@ public final class Main {
             port.getAccessibleContext().setAccessibleName("Puerto del emisor");
             actions.add(field("Puerto", port), BorderLayout.WEST);
             actions.add(toggle, BorderLayout.CENTER);
-            add(card, actions, 15);
+            addSpaced(card, actions, 15);
             return card;
         }
 
         private JPanel displayCard() {
             JPanel card = card();
-            add(card, label("Pantallas e imagen", 20, TEXT, true), 0);
-            add(card, field("Vista de escritorio", desktop), 10);
-            add(card, field("Segundo monitor", secondary), 8);
-            add(card, displayHint, 6);
+            addSpaced(card, label("Pantallas e imagen", 20, TEXT, true), 0);
+            addSpaced(card, field("Vista de escritorio", desktop), 10);
+            addSpaced(card, field("Segundo monitor", secondary), 8);
+            addSpaced(card, displayHint, 6);
             JPanel limits = new JPanel(new GridLayout(1, 2, 10, 0));
             limits.setOpaque(false);
             limits.add(field("Resolución máxima", resolution));
             limits.add(field("Velocidad máxima", fps));
-            add(card, limits, 10);
+            addSpaced(card, limits, 10);
             JButton openSettings = button("Configuración de pantallas", false);
             openSettings.addActionListener(event -> {
                 try { new ProcessBuilder("explorer.exe", "ms-settings:display").start(); }
                 catch (IOException error) { showMessage("Abre Configuración → Sistema → Pantalla.", true); }
             });
-            add(card, openSettings, 12);
+            addSpaced(card, openSettings, 12);
             return card;
         }
 
         private JPanel networkCard() {
             JPanel card = card();
-            add(card, label("Conexión", 20, TEXT, true), 0);
-            add(card, label("Usa la dirección correspondiente para una conexión manual.", 12, MUTED, false), 5);
-            add(card, routes, 10);
+            addSpaced(card, label("Conexión", 20, TEXT, true), 0);
+            addSpaced(card, label("Usa la dirección correspondiente para una conexión manual.", 12, MUTED, false), 5);
+            addSpaced(card, routes, 10);
             return card;
         }
 
@@ -287,7 +292,7 @@ public final class Main {
             if (!active.equals(currentRoutes) || routes.getComponentCount() == 0) {
                 currentRoutes = active;
                 routes.removeAll();
-                if (active.isEmpty()) add(routes, label("Conecta esta PC por Wi-Fi, Ethernet o USB.", 13, MUTED, false), 0);
+                if (active.isEmpty()) addSpaced(routes, label("Conecta esta PC por Wi-Fi, Ethernet o USB.", 13, MUTED, false), 0);
                 for (HostNetwork.Route route : active) {
                     String ip = route.address().getHostAddress();
                     JPanel row = new JPanel(new BorderLayout(10, 0));
@@ -296,7 +301,7 @@ public final class Main {
                     JButton copy = button("Copiar IP", false);
                     copy.addActionListener(event -> copy(ip, "IP copiada"));
                     row.add(copy, BorderLayout.EAST);
-                    add(routes, row, 5);
+                    addSpaced(routes, row, 5);
                 }
                 routes.revalidate();
                 routes.repaint();
@@ -341,8 +346,8 @@ public final class Main {
         JPanel panel = column();
         JLabel label = label(title, 12, MUTED, true);
         label.setLabelFor(control);
-        add(panel, label, 0);
-        add(panel, control, 3);
+        addSpaced(panel, label, 0);
+        addSpaced(panel, control, 3);
         return panel;
     }
 
@@ -360,7 +365,7 @@ public final class Main {
         return panel;
     }
 
-    private static void add(JPanel panel, JComponent child, int margin) {
+    private static void addSpaced(JPanel panel, JComponent child, int margin) {
         if (margin > 0) panel.add(Box.createVerticalStrut(margin));
         child.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(child);
