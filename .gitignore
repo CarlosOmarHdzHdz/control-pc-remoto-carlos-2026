@@ -3,3 +3,6 @@
 pc-sender/release*/
 previews/
 release-assets/
+*.p12
+*.keystore
+*.jks

@@ -25,8 +25,12 @@ $dex = Join-Path $out 'dex'
 if (-not (Test-Path $out)) { New-Item -ItemType Directory -Force $out | Out-Null }
 $resolvedOut = (Resolve-Path $out).Path.TrimEnd('\')
 if ($resolvedOut -ne (Join-Path $project 'build')) { throw "Carpeta de compilación inesperada: $resolvedOut" }
-if (Test-Path $classes) { Remove-Item -LiteralPath $classes -Recurse -Force }
-if (Test-Path $dex) { Remove-Item -LiteralPath $dex -Recurse -Force }
+foreach ($folder in @($classes, $dex)) {
+  if (Test-Path -LiteralPath $folder) {
+    if ((Resolve-Path -LiteralPath $folder).Path -ne $folder) { throw "Directorio inesperado: $folder" }
+    Remove-Item -LiteralPath $folder -Recurse -Force
+  }
+}
 foreach ($generatedFile in @((Join-Path $out 'receiver-unsigned.apk'), (Join-Path $out 'receiver-aligned.apk'), (Join-Path $out 'classes.dex'), (Join-Path $out 'resources.zip'), (Join-Path $out 'ProyectorReceiver.apk'))) {
   if (Test-Path $generatedFile) { Remove-Item -LiteralPath $generatedFile -Force }
 }
@@ -34,15 +38,17 @@ New-Item -ItemType Directory -Force $classes, $dex | Out-Null
 
 $unsigned = Join-Path $out 'receiver-unsigned.apk'
 $compiledResources = Join-Path $out 'resources.zip'
+$generated = Join-Path $out 'generated'
+New-Item -ItemType Directory -Force -Path $generated | Out-Null
 & (Join-Path $buildTools 'aapt2.exe') compile --dir (Join-Path $project 'res') -o $compiledResources
-if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo compilar el icono' }
-& (Join-Path $buildTools 'aapt2.exe') link -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --min-sdk-version 23 --target-sdk-version 35 --version-code 9 --version-name 1.8 -o $unsigned
+if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo compilar los recursos' }
+& (Join-Path $buildTools 'aapt2.exe') link --auto-add-overlay -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --java $generated --min-sdk-version 23 --target-sdk-version 35 --version-code 10 --version-name 1.9 -o $unsigned
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo crear el APK base' }
 
-$source = Join-Path $project 'src\com\proyector\receiver\MainActivity.java'
-& (Join-Path $jdk 'javac.exe') -encoding UTF-8 -source 8 -target 8 -classpath $platform -d $classes $source
+$sources = @(Get-ChildItem -Path (Join-Path $project 'src'), (Join-Path $project '..\shared\src'), $generated -Recurse -Filter '*.java' -File | Select-Object -ExpandProperty FullName)
+& (Join-Path $jdk 'javac.exe') -encoding UTF-8 -source 8 -target 8 -classpath $platform -d $classes @sources
 if ($LASTEXITCODE -ne 0) { throw 'javac no pudo compilar la APK' }
-& (Join-Path $buildTools 'd8.bat') --lib $platform --output $dex (Get-ChildItem $classes -Filter '*.class' -Recurse | Select-Object -ExpandProperty FullName)
+& (Join-Path $buildTools 'd8.bat') --min-api 23 --lib $platform --output $dex (Get-ChildItem $classes -Filter '*.class' -Recurse | Select-Object -ExpandProperty FullName)
 if ($LASTEXITCODE -ne 0) { throw 'd8 no pudo generar classes.dex' }
 Copy-Item (Join-Path $dex 'classes.dex') (Join-Path $out 'classes.dex')
 Push-Location $out
