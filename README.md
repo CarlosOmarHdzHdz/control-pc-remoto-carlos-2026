@@ -1,15 +1,13 @@
-# Control de PC
+# Orbivía
 
 Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla táctil. Conecta los equipos por Wi-Fi, por cable USB o mediante Tailscale si están en redes distintas.
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** Descarga el ZIP, extrae la carpeta completa y abre `ProyectorSender\ProyectorSender.exe`. El paquete trae su propio entorno Java. Conserva `app` y `runtime` junto al ejecutable.
-- **Android 6 o posterior.** Descarga e instala `ProyectorReceiver-1.10.0.apk`.
+- **Windows 10/11 de 64 bits.** Extrae la carpeta completa del ZIP y abre `Orbivia\Orbivia.exe`. Conserva las carpetas `app` y `runtime` junto al ejecutable. [Descargar Orbivía para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/main/downloads/Orbivia-Windows-1.11.0.zip)
+- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar la vinculación. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/main/downloads/Orbivia-Android-1.11.0.apk)
 
-[Descargar Control de PC 1.10.0](https://github.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/releases/tag/v1.10.0)
-
-Actualiza ambos equipos a la versión 1.10.0 para utilizar todos los atajos nuevos. Esta edición conserva el enlace cifrado y la reconexión entre direcciones IP.
+Orbivía 1.11.0 es el nuevo nombre de Control de PC. Esta versión renueva el inicio, el icono y la navegación de Android y Windows. [Sumas SHA-256](downloads/SHA256SUMS-1.11.0.txt)
 
 ## Conectar
 

@@ -8,7 +8,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/proyector_icon"
-        android:label="Control de PC"
+        android:label="Orbivía"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="false"
         android:theme="@style/ControlPcTheme">

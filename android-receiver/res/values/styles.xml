@@ -1,8 +1,9 @@
 <resources>
-    <style name="ControlPcTheme" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:colorAccent">#6CE6D3</item>
-        <item name="android:colorBackground">#0E1621</item>
-        <item name="android:windowBackground">#0E1621</item>
+    <style name="ControlPcTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#823D5F</item>
+        <item name="android:colorBackground">#F6F0E9</item>
+        <item name="android:windowBackground">#F6F0E9</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowActionModeOverlay">true</item>
