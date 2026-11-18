@@ -4,7 +4,7 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** Descarga el ZIP, extrae la carpeta completa y abre `ProyectorSender.exe`. El paquete trae su propio entorno Java. Conserva `app` y `runtime` junto al ejecutable.
+- **Windows 10/11 de 64 bits.** Descarga el ZIP, extrae la carpeta completa y abre `ProyectorSender\ProyectorSender.exe`. El paquete trae su propio entorno Java. Conserva `app` y `runtime` junto al ejecutable.
 - **Android 6 o posterior.** Descarga e instala `ProyectorReceiver-1.10.0.apk`.
 
 [Descargar Control de PC 1.10.0](https://github.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/releases/tag/v1.10.0)
