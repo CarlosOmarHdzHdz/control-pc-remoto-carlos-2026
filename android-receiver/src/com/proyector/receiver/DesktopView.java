@@ -7,13 +7,17 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.SystemClock;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewConfiguration;
 
 import com.proyector.shared.Wire;
 
 final class DesktopView extends View {
+    enum Mode { DIRECT, TOUCHPAD, VIEW_ONLY }
+
     interface Input {
         void send(int command, int... values);
         void keyboard();
@@ -23,8 +27,11 @@ final class DesktopView extends View {
     private final RectF destination = new RectF();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final int slop;
+    private final ScaleGestureDetector pinch;
+    private final GestureDetector pan;
     private Bitmap bitmap;
-    private boolean panelMode;
+    private Mode mode = Mode.DIRECT;
+    private float zoom = 1f, panX, panY;
     private float pointerSensitivity = 1.5f;
     private boolean moved, longPressed, pressed, twoFingers, secondTap, skipGesture;
     private float startX, startY, lastX, lastY, scrollY, relativeX, relativeY;
@@ -37,13 +44,69 @@ final class DesktopView extends View {
         slop = ViewConfiguration.get(context).getScaledTouchSlop();
         setBackgroundColor(Color.BLACK);
         setContentDescription("Escritorio de Windows a pantalla completa");
+        pinch = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                zoomTo(zoom * detector.getScaleFactor(), detector.getFocusX(), detector.getFocusY());
+                return true;
+            }
+        });
+        pinch.setQuickScaleEnabled(false);
+        pan = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+            @Override public boolean onDown(MotionEvent event) { return true; }
+            @Override public boolean onDoubleTap(MotionEvent event) {
+                zoomTo(zoom > 1f ? 1f : 2f, event.getX(), event.getY());
+                return true;
+            }
+            @Override public boolean onScroll(MotionEvent start, MotionEvent current, float dx, float dy) {
+                if (!pinch.isInProgress() && current.getPointerCount() == 1) {
+                    panX -= dx;
+                    panY -= dy;
+                    redrawViewport();
+                }
+                return true;
+            }
+        });
+        pan.setIsLongpressEnabled(false);
     }
 
-    void panelMode(boolean value) { endGesture(); panelMode = value; }
+    void mode(Mode value) {
+        endGesture();
+        mode = value;
+        resetZoom();
+        setContentDescription(mode == Mode.VIEW_ONLY ? "Escritorio en modo Solo ver" : "Escritorio de Windows a pantalla completa");
+    }
+
+    void resetZoom() {
+        zoom = 1f;
+        panX = panY = 0;
+        redrawViewport();
+    }
+
+    void zoomIn() {
+        if (mode == Mode.VIEW_ONLY) zoomTo(Math.min(4f, zoom * 1.5f), getWidth() / 2f, getHeight() / 2f);
+    }
+
+    private void zoomTo(float requested, float x, float y) {
+        float next = Math.max(1f, Math.min(4f, requested));
+        float ratio = next / zoom;
+        float fromCenterX = x - getWidth() / 2f;
+        float fromCenterY = y - getHeight() / 2f;
+        panX = fromCenterX - (fromCenterX - panX) * ratio;
+        panY = fromCenterY - (fromCenterY - panY) * ratio;
+        zoom = next;
+        redrawViewport();
+    }
+
     void pointerSensitivity(int percent) { pointerSensitivity = Math.max(.5f, Math.min(3f, percent / 100f)); }
+
+    Bitmap currentFrame() { return bitmap; }
 
     void image(Bitmap next) {
         bitmap = next;
+        redrawViewport();
+    }
+
+    private void redrawViewport() {
         measureImage();
         postInvalidateOnAnimation();
     }
@@ -53,10 +116,14 @@ final class DesktopView extends View {
     private void measureImage() {
         if (bitmap == null) { destination.setEmpty(); return; }
         float scale = Math.min(getWidth() / (float) bitmap.getWidth(), getHeight() / (float) bitmap.getHeight());
-        float width = bitmap.getWidth() * scale;
-        float height = bitmap.getHeight() * scale;
-        float left = (getWidth() - width) / 2f;
-        float top = (getHeight() - height) / 2f;
+        float width = bitmap.getWidth() * scale * zoom;
+        float height = bitmap.getHeight() * scale * zoom;
+        float maxX = Math.max(0f, (width - getWidth()) / 2f);
+        float maxY = Math.max(0f, (height - getHeight()) / 2f);
+        panX = Math.max(-maxX, Math.min(maxX, panX));
+        panY = Math.max(-maxY, Math.min(maxY, panY));
+        float left = (getWidth() - width) / 2f + panX;
+        float top = (getHeight() - height) / 2f + panY;
         destination.set(left, top, left + width, top + height);
     }
 
@@ -67,6 +134,12 @@ final class DesktopView extends View {
 
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (bitmap == null) return true;
+        if (mode == Mode.VIEW_ONLY) {
+            pinch.onTouchEvent(event);
+            pan.onTouchEvent(event);
+            return true;
+        }
+        boolean panelMode = mode == Mode.TOUCHPAD;
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
             startX = lastX = event.getX();
@@ -119,6 +192,7 @@ final class DesktopView extends View {
 
         float x = event.getX();
         float y = event.getY();
+        boolean panelMode = mode == Mode.TOUCHPAD;
         if (Math.hypot(x - startX, y - startY) > slop) { moved = true; removeCallbacks(longPress); }
         if (moved && panelMode) {
             if (!pressed && (secondTap || longPressed)) { input.send(Wire.DOWN, -1, -1); pressed = true; }
@@ -148,8 +222,8 @@ final class DesktopView extends View {
     private void click(float x, float y) {
         super.performClick();
         if (longPressed) {
-            if (panelMode || absolute(Wire.MOVE, x, y, false)) input.send(Wire.RIGHT_CLICK);
-        } else if (panelMode) {
+            if (mode == Mode.TOUCHPAD || absolute(Wire.MOVE, x, y, false)) input.send(Wire.RIGHT_CLICK);
+        } else if (mode == Mode.TOUCHPAD) {
             input.send(Wire.DOWN, -1, -1);
             input.send(Wire.UP, -1, -1);
             lastTap = SystemClock.uptimeMillis();

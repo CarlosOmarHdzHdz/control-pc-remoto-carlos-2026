@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.prefs.Preferences;
 
 public final class Main {
     private static final Color BACKGROUND = new Color(0xF6F0E9);
@@ -54,16 +55,19 @@ public final class Main {
 
     private static final class SenderWindow extends JFrame {
         private final String computer = Wire.displayName(System.getenv().getOrDefault("COMPUTERNAME", "Windows"));
+        private final Preferences preferences = Preferences.userRoot().node("/orbivia/sender");
         private final WindowsControl controls = new WindowsControl();
         private final JLabel connection = label("Emisor detenido", 13, SUBTLE_INK, true);
         private final JLabel video = label("Imagen en pausa", 12, SUBTLE_INK, false);
+        private final JLabel videoLimit = label("", 12, SUBTLE_INK, false);
         private final JLabel pin = label("··· ···", 38, ACCENT, true);
         private final JLabel identityLabel = label("Preparando identidad…", 12, MUTED, false);
         private final JLabel displayHint = label("Buscando pantallas en Windows…", 12, MUTED, false);
         private final JLabel message = label("Inicia el emisor para mostrar el código de conexión.", 13, MUTED, false);
         private final JButton toggle = button("Iniciar emisor", true);
         private final JButton copyPin = button("Copiar código", false);
-        private final JTextField port = new JTextField(Integer.toString(Wire.PORT), 5);
+        private final JTextField port = new JTextField(Integer.toString(
+                Math.clamp(preferences.getInt("port", Wire.PORT), 1024, 65535)), 5);
         private final JComboBox<Option> desktop = new JComboBox<>();
         private final JComboBox<Option> secondary = new JComboBox<>();
         private final JComboBox<String> resolution = new JComboBox<>(Wire.RESOLUTIONS.clone());
@@ -72,7 +76,10 @@ public final class Main {
         private final CardLayout layout = new CardLayout();
         private final MotionPane section = new MotionPane(layout);
         private final JButton[] navigation = new JButton[SECTIONS.length];
-        private final AtomicReference<Displays.Settings> settings = new AtomicReference<>(new Displays.Settings("", "", 3, 60));
+        private final AtomicReference<Displays.Settings> settings = new AtomicReference<>(new Displays.Settings(
+                preferences.get("desktop", ""), preferences.get("secondary", ""),
+                Math.clamp(preferences.getInt("quality", 3), 0, Wire.RESOLUTIONS.length - 1),
+                Wire.FRAME_RATES[Math.clamp(preferences.getInt("rateIndex", 4), 0, Wire.FRAME_RATES.length - 1)]));
         private HostIdentity identity;
         private HostServer server;
         private int serverGeneration;
@@ -111,8 +118,9 @@ public final class Main {
             copyPin.addActionListener(event -> { if (server != null) copy(server.pin(), "Código copiado"); });
             desktop.addActionListener(event -> updateSettings());
             secondary.addActionListener(event -> updateSettings());
-            resolution.setSelectedIndex(3);
-            fps.setSelectedIndex(4);
+            resolution.setSelectedIndex(settings.get().quality());
+            fps.setSelectedItem(settings.get().fps() + " FPS");
+            updateVideoLimit();
             resolution.addActionListener(event -> updateSettings());
             fps.addActionListener(event -> updateSettings());
             refresh = new Timer(1600, event -> refreshHardware());
@@ -150,6 +158,7 @@ public final class Main {
             side.add(Box.createVerticalGlue());
             addSpaced(side, connection, 10);
             addSpaced(side, video, 4);
+            addSpaced(side, videoLimit, 4);
             return side;
         }
 
@@ -175,7 +184,7 @@ public final class Main {
         private JPanel pairingCard() {
             JPanel card = card();
             addSpaced(card, editorial("Vincular Android", 29, TEXT), 0);
-            addSpaced(card, label("Abre Conexión en el teléfono y escribe el código.", 12, MUTED, false), 6);
+            addSpaced(card, label("Inicia el emisor y abre Conexión en Android.", 12, MUTED, false), 6);
             JPanel codeWell = new Surface(TEXT, new Color(0x432A54), 17);
             codeWell.setLayout(new BorderLayout(10, 0));
             codeWell.setBorder(BorderFactory.createEmptyBorder(8, 13, 8, 10));
@@ -220,7 +229,18 @@ public final class Main {
                 try { new ProcessBuilder("explorer.exe", "ms-settings:display").start(); }
                 catch (IOException error) { showMessage("Abre Configuración → Sistema → Pantalla.", true); }
             });
-            addSpaced(card, openSettings, 12);
+            JButton resetLimits = button("Restablecer límites", false);
+            resetLimits.addActionListener(event -> {
+                resolution.setSelectedIndex(Wire.RESOLUTIONS.length - 1);
+                fps.setSelectedIndex(Wire.FRAME_RATES.length - 1);
+                showMessage("Límites restablecidos a 1080p y 60 FPS.", false);
+            });
+            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
+            buttons.setOpaque(false);
+            buttons.add(openSettings);
+            buttons.add(Box.createHorizontalStrut(8));
+            buttons.add(resetLimits);
+            addSpaced(card, buttons, 12);
             return card;
         }
 
@@ -275,6 +295,7 @@ public final class Main {
                 });
                 server = host;
                 host.start();
+                preferences.putInt("port", number);
                 String digits = host.pin();
                 pin.setText(digits.substring(0, 3) + " " + digits.substring(3));
                 copyPin.setEnabled(true);
@@ -365,8 +386,18 @@ public final class Main {
             int rate = Math.max(0, fps.getSelectedIndex());
             settings.set(new Displays.Settings(((Option) desktop.getSelectedItem()).id,
                     ((Option) secondary.getSelectedItem()).id, quality, Wire.FRAME_RATES[rate]));
+            preferences.put("desktop", settings.get().desktop());
+            preferences.put("secondary", settings.get().secondary());
+            preferences.putInt("quality", quality);
+            preferences.putInt("rateIndex", rate);
+            updateVideoLimit();
             displayHint.setText(Displays.read().secondary(settings.get().secondary()) == null
                     ? "Sin pantalla adicional activa en Windows" : "Pantalla adicional disponible");
+        }
+
+        private void updateVideoLimit() {
+            Displays.Settings limit = settings.get();
+            videoLimit.setText("Límite " + Wire.RESOLUTIONS[limit.quality()] + " · " + limit.fps() + " FPS");
         }
 
         private void copy(String value, String feedback) {
@@ -379,6 +410,7 @@ public final class Main {
         private void showMessage(String value, boolean error) {
             message.setText(value);
             message.setForeground(error ? AMBER : MUTED);
+            message.setToolTipText(value);
         }
 
         private static void select(JComboBox<Option> control, String value) {

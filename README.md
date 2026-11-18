@@ -4,10 +4,10 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** Extrae la carpeta completa del ZIP y abre `Orbivia\Orbivia.exe`. Conserva las carpetas `app` y `runtime` junto al ejecutable. [Descargar Orbivía para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/main/downloads/Orbivia-Windows-1.11.0.zip)
-- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar la vinculación. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/main/downloads/Orbivia-Android-1.11.0.apk)
+- **Windows 10/11 de 64 bits.** Extrae la carpeta completa del ZIP y abre `Orbivia\Orbivia.exe`. Conserva las carpetas `app` y `runtime` junto al ejecutable. [Descargar Orbivía para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.12.0/downloads/Orbivia-Windows-1.12.0.zip)
+- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar la vinculación. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.12.0/downloads/Orbivia-Android-1.12.0.apk)
 
-Orbivía 1.11.0 es el nuevo nombre de Control de PC. Esta versión renueva el inicio, el icono y la navegación de Android y Windows. [Sumas SHA-256](downloads/SHA256SUMS-1.11.0.txt)
+Orbivía 1.12.0 añade herramientas dentro del visor, capturas PNG y un gráfico de la respuesta de la conexión. El emisor de Windows guarda la pantalla seleccionada, los límites de imagen y el puerto que funcionó en la última sesión. [Sumas SHA-256](downloads/SHA256SUMS-1.12.0.txt)
 
 ## Conectar
 
@@ -28,6 +28,8 @@ Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo co
 ## Escritorio, imagen y controles
 
 - **Control directo.** Toca los elementos del escritorio y arrástralos en la imagen. El **panel táctil** mueve el cursor al deslizar, hace clic al tocar y permite arrastrar con doble toque y pulsación mantenida.
+- **Solo ver.** Pellizca para ampliar hasta 4× y arrastra para recorrer la imagen. Los gestos de este modo actúan sobre la vista de Android.
+- **Herramientas del visor.** Toca el botón superior para cambiar de modo o perfil de imagen, consultar los FPS recibidos y la latencia, regular el volumen o escribir en Windows. **Guardar captura** exporta la imagen mostrada a un PNG en la ubicación que elijas.
 - **Gestos.** Dos dedos desplazan la página, una pulsación mantenida hace clic derecho y tres dedos abren el teclado. Usa Atrás en Android para salir del escritorio a pantalla completa.
 - **Imagen.** Elige hasta 1080p y un límite de hasta 60 FPS en **Remoto** o cambia de una vez entre **Ahorro**, **Equilibrado**, **Fluido** y **Full HD**. Activa el ajuste automático para que la app reduzca resolución y FPS si el enlace se satura. La resolución y los FPS reales dependen de Windows, Android y la red. La codificación JPEG usa la CPU. La captura se pausa al volver al menú o dejar la app en segundo plano.
 - **Panel táctil.** Ajusta su sensibilidad entre 50 % y 300 % para adaptar el desplazamiento del cursor a tu pantalla.
