@@ -69,6 +69,26 @@ final class Icon extends View {
                 canvas.drawLine(19, 10, 19, 20, paint);
                 canvas.drawCircle(19, 8, 2, paint);
                 break;
+            case "battery":
+                canvas.drawRoundRect(3, 6, 20, 18, 2, 2, paint);
+                canvas.drawLine(21, 10, 21, 14, paint);
+                canvas.drawRoundRect(6, 9, 9, 15, 1, 1, paint);
+                canvas.drawRoundRect(10, 9, 13, 15, 1, 1, paint);
+                break;
+            case "volume":
+                shape.moveTo(3, 9); shape.lineTo(7, 9); shape.lineTo(12, 5);
+                shape.lineTo(12, 19); shape.lineTo(7, 15); shape.lineTo(3, 15); shape.close();
+                canvas.drawPath(shape, paint);
+                canvas.drawArc(10, 7, 20, 17, -55, 110, false, paint);
+                canvas.drawArc(9, 3, 24, 21, -55, 110, false, paint);
+                break;
+            case "latency":
+                canvas.drawCircle(5, 18, 1.4f, paint);
+                canvas.drawLine(9, 18, 12, 13, paint);
+                canvas.drawLine(12, 13, 15, 15, paint);
+                canvas.drawLine(15, 15, 20, 7, paint);
+                canvas.drawCircle(20, 7, 1.4f, paint);
+                break;
             case "link":
                 canvas.save();
                 canvas.rotate(-42, 12, 12);

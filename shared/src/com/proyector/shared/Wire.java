@@ -9,8 +9,8 @@ import java.security.cert.Certificate;
 public final class Wire {
     public static final int PORT = 5050;
     public static final int DISCOVERY_PORT = 5051;
-    public static final String DISCOVERY_PREFIX = "CONTROLPC/2";
-    public static final int MAGIC = 0x43504332;
+    public static final String DISCOVERY_PREFIX = "CONTROLPC/3";
+    public static final int MAGIC = 0x43504333;
     public static final int MAX_FRAME = 3 * 1024 * 1024;
     public static final int COORDINATE_MAX = 1_000_000;
 
@@ -45,6 +45,8 @@ public final class Wire {
     public static final int VIEW = 17;
     public static final int FRAME_ACK = 18;
     public static final int PING = 19;
+    // Curated Windows shortcuts. Values are validated again by the Windows helper.
+    public static final int SHORTCUT = 20;
 
     public static final int PAUSED = 0;
     public static final int DESKTOP = 1;

@@ -53,7 +53,34 @@ internal static class WindowsControls
             Int32.TryParse(line.Substring(4), NumberStyles.None, CultureInfo.InvariantCulture, out percent) &&
             percent >= 0 && percent <= 100)
             return "VOL:" + Audio("set", percent);
+        int shortcut;
+        if (line.StartsWith("shortcut ", StringComparison.Ordinal) &&
+            Int32.TryParse(line.Substring(9), NumberStyles.None, CultureInfo.InvariantCulture, out shortcut))
+            return SendShortcut(shortcut);
         throw new InvalidOperationException("Orden de Windows desconocida.");
+    }
+
+    private static string SendShortcut(int shortcut)
+    {
+        // Allow only the controls exposed by the Android UI. No arbitrary key sequences.
+        byte[][] keys;
+        string label;
+        switch (shortcut)
+        {
+            case 1: keys = new[] { new byte[] { 0x5B, 0x44 } }; label = "Escritorio"; break; // Win+D
+            case 2: keys = new[] { new byte[] { 0x12, 0x09 } }; label = "Cambiar ventana"; break; // Alt+Tab
+            case 3: keys = new[] { new byte[] { 0x11, 0x10, 0x1B } }; label = "Administrador de tareas"; break; // Ctrl+Shift+Esc
+            case 4: keys = new[] { new byte[] { 0xB3 } }; label = "Reproducir o pausar"; break;
+            case 5: keys = new[] { new byte[] { 0xB1 } }; label = "Pista anterior"; break;
+            case 6: keys = new[] { new byte[] { 0xB0 } }; label = "Pista siguiente"; break;
+            default: throw new InvalidOperationException("Acceso directo no permitido.");
+        }
+        foreach (byte[] chord in keys)
+        {
+            for (int i = 0; i < chord.Length; i++) keybd_event(chord[i], 0, 0, UIntPtr.Zero);
+            for (int i = chord.Length - 1; i >= 0; i++) keybd_event(chord[i], 0, 2, UIntPtr.Zero);
+        }
+        return "Atajo enviado: " + label;
     }
 
     private static string SchedulePower(bool restart)
@@ -142,6 +169,7 @@ internal static class WindowsControls
 
     [DllImport("kernel32.dll")] private static extern bool GetSystemPowerStatus(out PowerStatus status);
     [DllImport("user32.dll")] private static extern bool LockWorkStation();
+    [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extraInfo);
     [DllImport("powrprof.dll")] [return: MarshalAs(UnmanagedType.U1)]
     private static extern bool SetSuspendState([MarshalAs(UnmanagedType.U1)] bool hibernate,
         [MarshalAs(UnmanagedType.U1)] bool force, [MarshalAs(UnmanagedType.U1)] bool disableWakeEvent);

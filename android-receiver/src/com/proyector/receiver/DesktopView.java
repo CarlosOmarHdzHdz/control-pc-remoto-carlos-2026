@@ -25,6 +25,7 @@ final class DesktopView extends View {
     private final int slop;
     private Bitmap bitmap;
     private boolean panelMode;
+    private float pointerSensitivity = 1.5f;
     private boolean moved, longPressed, pressed, twoFingers, secondTap, skipGesture;
     private float startX, startY, lastX, lastY, scrollY, relativeX, relativeY;
     private long lastMotion, lastTap;
@@ -39,6 +40,7 @@ final class DesktopView extends View {
     }
 
     void panelMode(boolean value) { endGesture(); panelMode = value; }
+    void pointerSensitivity(int percent) { pointerSensitivity = Math.max(.5f, Math.min(3f, percent / 100f)); }
 
     void image(Bitmap next) {
         bitmap = next;
@@ -120,8 +122,8 @@ final class DesktopView extends View {
         if (Math.hypot(x - startX, y - startY) > slop) { moved = true; removeCallbacks(longPress); }
         if (moved && panelMode) {
             if (!pressed && (secondTap || longPressed)) { input.send(Wire.DOWN, -1, -1); pressed = true; }
-            relativeX += (x - lastX) * 1.5f;
-            relativeY += (y - lastY) * 1.5f;
+            relativeX += (x - lastX) * pointerSensitivity;
+            relativeY += (y - lastY) * pointerSensitivity;
             if (SystemClock.uptimeMillis() - lastMotion >= 16) flushRelative();
         } else if (moved && !panelMode) {
             if (!pressed) pressed = absolute(Wire.DOWN, startX, startY, false);

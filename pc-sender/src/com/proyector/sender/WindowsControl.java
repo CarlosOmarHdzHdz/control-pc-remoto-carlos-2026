@@ -49,6 +49,7 @@ final class WindowsControl {
             case Wire.SLEEP -> "sleep";
             case Wire.RESTART -> "restart";
             case Wire.SHUTDOWN -> "shutdown";
+            case Wire.SHORTCUT -> "shortcut " + value;
             default -> throw new IllegalArgumentException("Orden desconocida");
         };
         try {

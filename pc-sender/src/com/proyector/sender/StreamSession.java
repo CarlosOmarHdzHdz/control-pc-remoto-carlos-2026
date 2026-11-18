@@ -192,6 +192,11 @@ final class StreamSession {
                     }
                     case Wire.STATUS, Wire.MUTE, Wire.VOLUME_UP, Wire.VOLUME_DOWN,
                          Wire.LOCK, Wire.SLEEP, Wire.SHUTDOWN, Wire.RESTART -> queryWindows(operation, 0);
+                    case Wire.SHORTCUT -> {
+                        int shortcut = input.readInt();
+                        if (shortcut < 1 || shortcut > 6) throw new IOException("Acceso directo inválido");
+                        queryWindows(operation, shortcut);
+                    }
                     default -> throw new IOException("Orden desconocida");
                 }
             }

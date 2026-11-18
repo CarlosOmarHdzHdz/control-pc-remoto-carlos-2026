@@ -51,6 +51,11 @@ public final class ProtocolTest {
                     (success, data) -> status.complete(success ? data : "ERROR " + data));
             String reports = status.get(10, TimeUnit.SECONDS);
             check(reports.matches("STAT:(?:NA|[0-9]{1,3}):[01]:(?:NA|[0-9]{1,3}):[01]"), "Estado nativo inesperado: " + reports);
+            CompletableFuture<String> rejectedShortcut = new CompletableFuture<>();
+            audio.request(Wire.SHORTCUT, 7, () -> true,
+                    (success, data) -> rejectedShortcut.complete((success ? "OK " : "ERROR ") + data));
+            check("ERROR Acceso directo no permitido.".equals(rejectedShortcut.get(10, TimeUnit.SECONDS)),
+                    "El emisor solo debe admitir los atajos permitidos");
             try (HostServer host = host(identity, audio)) {
                 host.start();
                 secureSession(identity, host);
@@ -64,7 +69,7 @@ public final class ProtocolTest {
                     }
                 }
             }
-            System.out.println("Correcto: identidad persistente, TLS, PIN, reconexión, pausa, dos imágenes en tránsito, Full HD, escalado y estado nativo.");
+            System.out.println("Correcto: identidad persistente, TLS, PIN, reconexión, pausa, imágenes en tránsito, Full HD, escalado, estado nativo y lista cerrada de atajos.");
         } finally {
             Files.deleteIfExists(key);
             Files.deleteIfExists(directory);

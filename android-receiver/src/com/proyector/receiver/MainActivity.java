@@ -29,6 +29,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -73,6 +74,8 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean drawScheduled = new AtomicBoolean();
     private final List<View> powerButtons = new ArrayList<>();
     private final List<View> audioButtons = new ArrayList<>();
+    private final List<View> shortcutButtons = new ArrayList<>();
+    private final List<View> profileTiles = new ArrayList<>();
     private final String[] routeAddresses = {"", "", ""};
     private final String[] routePorts = {"5050", "5050", "5050"};
     private final Runnable accessibleVolume = this::applyVolumeFromAccessibility;
@@ -101,6 +104,7 @@ public final class MainActivity extends Activity {
     private boolean volumeDragging;
     private int volume = -1, battery = -1, phoneBattery = -1;
     private int quality = 2, frameRate = 2, page = HOME;
+    private int pointerSpeed = 150;
     private boolean adaptive = true;
     private long latency = -1;
     private int monitorCount;
@@ -114,10 +118,11 @@ public final class MainActivity extends Activity {
     private LinearLayout shell, nav, manualFields;
     private View[] pages;
     private Button[] modeButtons;
+    private Switch adaptiveSwitch;
     private NavItem[] navigation;
     private DesktopView desktop;
     private TextView badge, phoneLabel, homeComputer, homeStatus, homeBattery, homeVolume, homeLatency;
-    private TextView result, resolutionHint, measurement, monitorHint, videoHint, volumeLabel, discovery, connectionStatus, routeHint;
+    private TextView result, resolutionHint, measurement, profileHint, pointerSpeedLabel, monitorHint, videoHint, volumeLabel, discovery, connectionStatus, routeHint;
     private Button connect, manualToggle, usbSettings, adb, forget, startSecond, mute, qualityButton, rateButton;
     private EditText pin, address, port;
     private SeekBar slider;
@@ -142,11 +147,14 @@ public final class MainActivity extends Activity {
         quality = bounded(preferences.getInt("quality", 2), Wire.RESOLUTIONS.length - 1);
         frameRate = bounded(preferences.getInt("fps", 2), Wire.FRAME_RATES.length - 1);
         adaptive = preferences.getBoolean("adaptive", true);
+        pointerSpeed = bounded(preferences.getInt("pointerSpeed", 150), 300);
+        pointerSpeed = Math.max(50, pointerSpeed);
         if (restored != null) page = bounded(restored.getInt("page", HOME), TAB_NAMES.length - 1);
         desktop = new DesktopView(this, new DesktopView.Input() {
             @Override public void send(int command, int... values) { if (gotFrame) link.pointer(command, visibleSequence, values); }
             @Override public void keyboard() { showKeyboard(); }
         });
+        desktop.pointerSensitivity(pointerSpeed);
         link = new ReceiverLink(main, new LinkEvents());
         buildUi();
     }
@@ -285,6 +293,7 @@ public final class MainActivity extends Activity {
     private View homePage() {
         LinearLayout content = page("Inicio");
         LinearLayout device = card(false);
+        device.setBackground(gradientSurface(new int[]{Color.rgb(31, 62, 83), Color.rgb(22, 37, 54)}, 20, BORDER));
         LinearLayout heading = horizontal();
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.addView(iconBadge("screen"), lp(dp(48), dp(48)));
@@ -292,47 +301,54 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams detailsLayout = weighted(1f);
         detailsLayout.setMarginStart(dp(12));
         heading.addView(details, detailsLayout);
-        homeComputer = title("Tu computadora", 21);
-        homeStatus = text("", 13, MUTED, false);
+        homeComputer = title("Tu computadora", 22);
+        homeStatus = text("", 14, MUTED, false);
         details.addView(homeComputer);
         add(details, homeStatus, 4);
         device.addView(heading);
-        Button manage = button("Abrir conexión", false);
+        LinearLayout heroActions = horizontal();
+        Button viewDesktop = button("Ver escritorio", true);
+        viewDesktop.setOnClickListener(view -> openViewer(Wire.DESKTOP, false));
+        heroActions.addView(viewDesktop, weighted(1f));
+        Button manage = button("Conexión", false);
+        LinearLayout.LayoutParams manageLayout = weighted(1f);
+        manageLayout.setMarginStart(dp(8));
+        heroActions.addView(manage, manageLayout);
         manage.setOnClickListener(view -> showPage(CONNECTION, true));
-        add(device, manage, 14);
+        add(device, heroActions, 15);
+        add(content, device, 13);
 
-        LinearLayout metrics = card(false);
-        metrics.addView(title("Estado de la PC", 16));
-        homeBattery = text("", 14, MUTED, false);
-        homeVolume = text("", 14, MUTED, false);
-        homeLatency = text("", 13, MUTED, false);
-        add(metrics, homeBattery, 11);
-        add(metrics, homeVolume, 6);
-        add(metrics, homeLatency, 6);
-        add(content, columns(device, metrics), 13);
+        add(content, sectionHeading("Estado en tiempo real", "La conexión se pausa cuando no estás viendo la pantalla."), 19);
+        homeBattery = title("—", 17);
+        homeVolume = title("—", 17);
+        homeLatency = title("—", 17);
+        add(content, tilePair(metricCard("battery", "Batería de Windows", homeBattery),
+                metricCard("volume", "Volumen", homeVolume)), 9);
+        add(content, metricCard("latency", "Respuesta de la conexión", homeLatency), 8);
 
-        add(content, title("Acciones rápidas", 17), 20);
+        add(content, sectionHeading("Acciones rápidas", "Lo más usado, a un toque."), 19);
         add(content, tilePair(tile("screen", "Ver escritorio", "Toca directamente la pantalla de Windows", () -> openViewer(Wire.DESKTOP, false)),
                 tile("touch", "Panel táctil", "Mueve el cursor como con un touchpad", () -> openViewer(Wire.DESKTOP, true))), 10);
         add(content, tilePair(tile("dual", "Segundo monitor", "Abre una pantalla adicional de Windows", () -> showPage(MONITOR, true)),
-                tile("sliders", "Controles", "Audio, sesión y energía", () -> showPage(CONTROLS, true))), 9);
+                tile("sliders", "Controles", "Audio, atajos y energía", () -> showPage(CONTROLS, true))), 9);
         return scroll(content);
     }
 
     private View remotePage() {
         LinearLayout content = page("Escritorio remoto");
+        profileTiles.clear();
         add(content, columns(tile("screen", "Control directo", "Toca, selecciona y arrastra en el escritorio.", () -> openViewer(Wire.DESKTOP, false)),
                 tile("touch", "Panel táctil", "Desliza para mover el cursor. Toca para hacer clic.", () -> openViewer(Wire.DESKTOP, true))), 13);
         LinearLayout video = card(false);
         video.addView(title("Calidad de imagen", 17));
-        Switch auto = new Switch(this);
-        auto.setText("Ajuste automático");
-        auto.setTextColor(TEXT);
-        auto.setMinHeight(dp(47));
-        auto.setThumbTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}}, new int[]{ACCENT, MUTED}));
-        auto.setChecked(adaptive);
-        auto.setOnCheckedChangeListener((view, enabled) -> { adaptive = enabled; saveVideoSettings(); });
-        add(video, auto, 4);
+        adaptiveSwitch = new Switch(this);
+        adaptiveSwitch.setText("Ajuste automático");
+        adaptiveSwitch.setTextColor(TEXT);
+        adaptiveSwitch.setMinHeight(dp(47));
+        adaptiveSwitch.setThumbTintList(new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}}, new int[]{ACCENT, MUTED}));
+        adaptiveSwitch.setChecked(adaptive);
+        adaptiveSwitch.setOnCheckedChangeListener((view, enabled) -> { adaptive = enabled; saveVideoSettings(); });
+        add(video, adaptiveSwitch, 4);
         qualityButton = button("", false);
         qualityButton.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Resolución máxima")
                 .setSingleChoiceItems(Wire.RESOLUTIONS, quality, (dialog, selected) -> {
@@ -353,13 +369,49 @@ public final class MainActivity extends Activity {
         measurement = text("", 12, ACCENT, false);
         add(video, measurement, 6);
 
+        LinearLayout profiles = card(false);
+        profiles.addView(title("Perfiles de imagen", 17));
+        add(profiles, text("Cambia resolución y fluidez juntos. El ajuste automático se adapta a la red.", 13, MUTED, false), 5);
+        profileHint = text("", 12, ACCENT, true);
+        add(profiles, profileHint, 8);
+        add(profiles, tilePair(profileButton("Ahorro", "540p · 20 FPS", 1, 1, true),
+                profileButton("Equilibrado", "720p · 30 FPS", 2, 2, true)), 8);
+        add(profiles, tilePair(profileButton("Fluido", "720p · 60 FPS", 2, 4, true),
+                profileButton("Full HD", "1080p · 30 FPS", 3, 2, false)), 8);
+
+        LinearLayout pointer = card(false);
+        pointer.addView(title("Sensibilidad del panel táctil", 17));
+        pointerSpeedLabel = text(pointerSpeed + " %", 14, ACCENT, true);
+        add(pointer, pointerSpeedLabel, 7);
+        SeekBar speed = new SeekBar(this);
+        speed.setMax(250);
+        speed.setProgress(pointerSpeed - 50);
+        speed.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        speed.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        speed.setContentDescription("Sensibilidad del panel táctil, del 50 al 300 por ciento");
+        speed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean user) {
+                if (!user) return;
+                pointerSpeed = value + 50;
+                pointerSpeedLabel.setText(pointerSpeed + " %");
+                desktop.pointerSensitivity(pointerSpeed);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                preferences.edit().putInt("pointerSpeed", pointerSpeed).apply();
+            }
+        });
+        pointer.addView(speed, lp(-1, dp(42)));
+        add(pointer, text("Ajusta cuánto se mueve el cursor con cada deslizamiento.", 12, MUTED, false), 2);
+
         LinearLayout gestures = card(false);
         gestures.addView(title("Gestos en pantalla completa", 17));
         add(gestures, text("Dos dedos  ·  Desplazar", 14, MUTED, false), 8);
         add(gestures, text("Mantener pulsado  ·  Clic derecho", 14, MUTED, false), 7);
         add(gestures, text("Tres dedos  ·  Abrir teclado", 14, MUTED, false), 7);
         add(gestures, text("Panel táctil: toca dos veces y mantén para arrastrar.", 13, MUTED, false), 9);
-        add(content, columns(video, gestures), 13);
+        add(content, columns(video, profiles), 13);
+        add(content, columns(pointer, gestures), 10);
         return scroll(content);
     }
 
@@ -384,6 +436,7 @@ public final class MainActivity extends Activity {
     private View controlsPage() {
         powerButtons.clear();
         audioButtons.clear();
+        shortcutButtons.clear();
         LinearLayout content = page("Controles de la PC");
         LinearLayout audio = card(false);
         audio.addView(title("Volumen", 19));
@@ -424,7 +477,15 @@ public final class MainActivity extends Activity {
                 control("Suspender", Wire.SLEEP, "Windows quedará en reposo y la conexión se interrumpirá.", powerButtons)), 10);
         add(power, tilePair(control("Reiniciar", Wire.RESTART, "Guarda el trabajo abierto antes de reiniciar.", powerButtons),
                 control("Apagar PC", Wire.SHUTDOWN, "Guarda el trabajo abierto antes de apagar.", powerButtons)), 8);
+        LinearLayout shortcuts = card(false);
+        shortcuts.addView(title("Atajos y multimedia", 19));
+        add(shortcuts, text("Atajos permitidos de Windows y controles del reproductor.", 13, MUTED, false), 4);
+        add(shortcuts, tilePair(shortcut("Escritorio", 1), shortcut("Cambiar ventana", 2)), 8);
+        add(shortcuts, shortcut("Administrador de tareas", 3), 7);
+        add(shortcuts, tilePair(shortcut("Reproducir / pausar", 4), shortcut("Anterior", 5)), 7);
+        add(shortcuts, shortcut("Siguiente", 6), 7);
         add(content, columns(audio, power), 13);
+        add(content, shortcuts, 10);
         result = text("", 14, MUTED, false);
         result.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(content, result, 12);
@@ -689,13 +750,16 @@ public final class MainActivity extends Activity {
         badge.setBackground(tappable(connected ? ACCENT_SURFACE : WELL, 16, BORDER));
         phoneLabel.setText(phoneBattery < 0 ? "" : "Android " + phoneBattery + " %");
         homeComputer.setText(computer.isEmpty() ? "Tu computadora" : computer);
-        homeStatus.setText(connected ? "Cifrado activo por " + route : status);
-        homeBattery.setText(!connected ? "Batería de la PC  ·  —" : battery < 0 ? "Batería de la PC  ·  sin datos"
-                : "Batería de la PC  ·  " + battery + " %" + (charging ? " · cargando" : ""));
-        homeVolume.setText(volume < 0 || !connected ? "Volumen  ·  —" : "Volumen  ·  " + volume + " %" + (muted ? " · en silencio" : ""));
-        homeLatency.setText(!connected || latency < 0 ? "Tiempo de respuesta  ·  —" : "Tiempo de respuesta  ·  " + latency + " ms");
+        homeStatus.setText(connected ? "Cifrado activo · " + route + " · " + networkQuality() : status);
+        homeBattery.setText(!connected ? "—" : battery < 0 ? "N/D" : battery + " %" + (charging ? "  ↗" : ""));
+        homeBattery.setTextColor(battery >= 0 && battery <= 15 ? WARNING : TEXT);
+        homeVolume.setText(volume < 0 || !connected ? "—" : volume + " %" + (muted ? "  ·  Silencio" : ""));
+        homeVolume.setTextColor(muted ? WARNING : TEXT);
+        homeLatency.setText(!connected || latency < 0 ? "—" : latency + " ms");
+        homeLatency.setTextColor(latency >= 0 && latency > 180 ? WARNING : TEXT);
         for (View control : powerButtons) control.setEnabled(connected);
         for (View control : audioButtons) control.setEnabled(connected && volume >= 0);
+        for (View control : shortcutButtons) control.setEnabled(connected);
         slider.setEnabled(connected && volume >= 0);
         if (!volumeDragging) {
             slider.setProgress(Math.max(0, volume));
@@ -721,6 +785,30 @@ public final class MainActivity extends Activity {
         resolutionHint.setText(adaptive ? "La calidad baja si la red o la PC se saturan." : "La resolución y los FPS elegidos son límites máximos.");
         measurement.setVisibility(lastVideo.isEmpty() ? View.GONE : View.VISIBLE);
         measurement.setText("Última medición  ·  " + lastVideo);
+        String currentProfile = selectedProfile();
+        if (profileHint != null) profileHint.setText("Perfil actual  ·  " + currentProfile);
+        for (View tile : profileTiles) {
+            boolean selected = currentProfile.equals(tile.getTag());
+            if (tile.isSelected() != selected) {
+                tile.setSelected(selected);
+                tile.setBackground(tappable(selected ? ACCENT_SURFACE : PANEL, 17, selected ? ACCENT : BORDER));
+            }
+        }
+    }
+
+    private String selectedProfile() {
+        if (quality == 1 && frameRate == 1 && adaptive) return "Ahorro";
+        if (quality == 2 && frameRate == 2 && adaptive) return "Equilibrado";
+        if (quality == 2 && frameRate == 4 && adaptive) return "Fluido";
+        if (quality == 3 && frameRate == 2 && !adaptive) return "Full HD";
+        return "Personalizado";
+    }
+
+    private String networkQuality() {
+        if (latency < 0) return "midiendo respuesta";
+        if (latency <= 80) return "respuesta rápida";
+        if (latency <= 180) return "enlace estable";
+        return "respuesta lenta";
     }
 
     private void saveVideoSettings() {
@@ -739,7 +827,8 @@ public final class MainActivity extends Activity {
         View current = pages[page];
         current.setAlpha(animate ? .6f : 1f);
         current.setTranslationY(animate ? dp(6) : 0f);
-        if (animate) current.animate().alpha(1f).translationY(0f).setDuration(155).start();
+        if (animate) current.animate().alpha(1f).translationY(0f).setDuration(210)
+                .setInterpolator(new DecelerateInterpolator()).start();
     }
 
     private void openViewer(int desired, boolean panelMode) {
@@ -983,6 +1072,57 @@ public final class MainActivity extends Activity {
         return button;
     }
 
+    private Button shortcut(String label, int shortcut) {
+        Button action = button(label, false);
+        action.setContentDescription("Enviar atajo de Windows: " + label);
+        action.setOnClickListener(view -> execute(Wire.SHORTCUT, shortcut));
+        shortcutButtons.add(action);
+        return action;
+    }
+
+    private View profileButton(String name, String details, int resolutionIndex, int fpsIndex, boolean auto) {
+        LinearLayout option = card(true);
+        option.setMinimumHeight(dp(76));
+        option.addView(title(name, 15));
+        add(option, text(details, 12, MUTED, false), 3);
+        option.setContentDescription(name + ", " + details);
+        option.setTag(name);
+        profileTiles.add(option);
+        option.setOnClickListener(view -> {
+            quality = resolutionIndex;
+            frameRate = fpsIndex;
+            adaptive = auto;
+            if (adaptiveSwitch != null && adaptiveSwitch.isChecked() != auto) adaptiveSwitch.setChecked(auto);
+            saveVideoSettings();
+            option.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
+        });
+        return option;
+    }
+
+    private View metricCard(String icon, String label, TextView value) {
+        LinearLayout metric = card(false);
+        metric.setMinimumHeight(dp(93));
+        metric.setPadding(dp(12), dp(11), dp(12), dp(11));
+        LinearLayout heading = horizontal();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.addView(iconBadge(icon), lp(dp(27), dp(27)));
+        TextView caption = text(label, 11, MUTED, true);
+        LinearLayout.LayoutParams captionParams = weighted(1f);
+        captionParams.setMarginStart(dp(7));
+        heading.addView(caption, captionParams);
+        metric.addView(heading);
+        add(metric, value, 7);
+        metric.setContentDescription(label);
+        return metric;
+    }
+
+    private LinearLayout sectionHeading(String heading, String detail) {
+        LinearLayout block = vertical();
+        block.addView(title(heading, 17));
+        add(block, text(detail, 12, MUTED, false), 3);
+        return block;
+    }
+
     private static int percent(String value) {
         try { return bounded(Integer.parseInt(value), 100); }
         catch (NumberFormatException absent) { return -1; }
@@ -1000,6 +1140,14 @@ public final class MainActivity extends Activity {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(dp(wide ? 22 : 15), dp(17), dp(wide ? 22 : 15), dp(21));
         column.addView(title(heading, 27));
+        String detail;
+        if ("Inicio".equals(heading)) detail = "Tu PC, el estado del enlace y tus acciones principales.";
+        else if ("Escritorio remoto".equals(heading)) detail = "Ajusta la imagen y el control táctil a tu conexión.";
+        else if ("Segundo monitor".equals(heading)) detail = "Abre una pantalla extendida que Windows ya reconozca.";
+        else if ("Controles de la PC".equals(heading)) detail = "Audio, accesos rápidos, bloqueo y energía.";
+        else if ("Conexión".equals(heading)) detail = "Vincula tus equipos con una conexión privada cifrada.";
+        else detail = "Control remoto de Windows";
+        add(column, text(detail, 13, MUTED, false), 4);
         return column;
     }
 
@@ -1046,6 +1194,13 @@ public final class MainActivity extends Activity {
         view.setPadding(dp(14), dp(13), dp(14), dp(13));
         view.setBackground(action ? tappable(PANEL, 17, BORDER) : surface(PANEL, 17, BORDER));
         return view;
+    }
+
+    private GradientDrawable gradientSurface(int[] colors, int radius, int stroke) {
+        GradientDrawable shape = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        shape.setCornerRadius(dp(radius));
+        shape.setStroke(dp(1), stroke);
+        return shape;
     }
 
     private View iconBadge(String name) {

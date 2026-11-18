@@ -5,11 +5,11 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 ## Descargar e instalar
 
 - **Windows 10/11 de 64 bits.** Descarga el ZIP, extrae la carpeta completa y abre `ProyectorSender.exe`. El paquete trae su propio entorno Java. Conserva `app` y `runtime` junto al ejecutable.
-- **Android 6 o posterior.** Descarga e instala `ProyectorReceiver-1.9.1.apk`.
+- **Android 6 o posterior.** Descarga e instala `ProyectorReceiver-1.10.0.apk`.
 
-[Abrir las descargas de la versión 1.9.1](https://github.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/releases/tag/v1.9.1)
+[Descargar Control de PC 1.10.0](https://github.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/releases/tag/v1.10.0)
 
-Actualiza ambos equipos a la versión 1.9.1. Esta edición incluye el protocolo cifrado y el arranque corregido del emisor en Windows.
+Actualiza ambos equipos a la versión 1.10.0 para utilizar todos los atajos nuevos. Esta edición conserva el enlace cifrado y la reconexión entre direcciones IP.
 
 ## Conectar
 
@@ -31,7 +31,9 @@ Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo co
 
 - **Control directo.** Toca los elementos del escritorio y arrástralos en la imagen. El **panel táctil** mueve el cursor al deslizar, hace clic al tocar y permite arrastrar con doble toque y pulsación mantenida.
 - **Gestos.** Dos dedos desplazan la página, una pulsación mantenida hace clic derecho y tres dedos abren el teclado. Usa Atrás en Android para salir del escritorio a pantalla completa.
-- **Imagen.** Elige hasta 1080p y un límite de hasta 60 FPS en **Remoto**. Activa el ajuste automático para que la app reduzca resolución y FPS si el enlace se satura. La resolución y los FPS reales dependen de Windows, Android y la red. La codificación JPEG usa la CPU. La captura se pausa al volver al menú o dejar la app en segundo plano.
+- **Imagen.** Elige hasta 1080p y un límite de hasta 60 FPS en **Remoto** o cambia de una vez entre **Ahorro**, **Equilibrado**, **Fluido** y **Full HD**. Activa el ajuste automático para que la app reduzca resolución y FPS si el enlace se satura. La resolución y los FPS reales dependen de Windows, Android y la red. La codificación JPEG usa la CPU. La captura se pausa al volver al menú o dejar la app en segundo plano.
+- **Panel táctil.** Ajusta su sensibilidad entre 50 % y 300 % para adaptar el desplazamiento del cursor a tu pantalla.
+- **Atajos y multimedia.** Envía los atajos limitados **Win+D**, **Alt+Tab** y **Ctrl+Shift+Esc**, y controla reproducción, pista anterior y siguiente sin salir del escritorio.
 - **Audio y energía.** Consulta el volumen real y la batería de Windows. Sube o baja el nivel en pasos de 5 %, silencia, reactiva o fíjalo con el deslizador. Puedes bloquear, suspender, reiniciar o apagar la PC. Suspensión, reinicio y apagado requieren confirmación en Android.
 
 ## Segundo monitor
