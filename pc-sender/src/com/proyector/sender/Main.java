@@ -85,7 +85,7 @@ public final class Main {
             super("Orbivía · Emisor");
             setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             setMinimumSize(new Dimension(660, 510));
-            setSize(930, 640);
+            setSize(906, 554);
             setLocationByPlatform(true);
             setIconImage(mark(48));
 
@@ -134,7 +134,10 @@ public final class Main {
             JLabel name = label(computer, 12, SUBTLE_INK, false);
             name.setToolTipText(computer);
             addSpaced(side, name, 3);
-            addSpaced(side, new JSeparator(), 21);
+            JSeparator divider = new JSeparator();
+            divider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+            divider.setForeground(new Color(0x59466D));
+            addSpaced(side, divider, 21);
             for (int i = 0; i < SECTIONS.length; i++) {
                 int index = i;
                 JButton tab = new StyledButton(SECTIONS[i], false, true);
@@ -151,8 +154,9 @@ public final class Main {
         }
 
         private static JScrollPane page(JPanel contents) {
-            JPanel stack = column();
-            addSpaced(stack, contents, 0);
+            JPanel stack = new JPanel(new BorderLayout());
+            stack.setOpaque(false);
+            stack.add(contents, BorderLayout.NORTH);
             JScrollPane scroll = new JScrollPane(stack);
             scroll.setBorder(null);
             scroll.getViewport().setBackground(BACKGROUND);

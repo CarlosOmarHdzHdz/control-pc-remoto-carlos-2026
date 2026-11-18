@@ -1,2 +1,2 @@
 f42b766fd3eb834d26b2d76bd76850f64b7c805ecc684abccf8dd1511a0859a7  Orbivia-Android-1.11.0.apk
-de0c25bd724346311850a9aae969662e7ec56051bfe192e27d64c360a87ee7a7  Orbivia-Windows-1.11.0.zip
+6316884d97bbae0e80b7530e9f24ea1963c9f33a8cf8ebeb51a34aa6dabfd9f2  Orbivia-Windows-1.11.0.zip
