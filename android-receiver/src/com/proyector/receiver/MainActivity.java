@@ -61,17 +61,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class MainActivity extends Activity {
-    private static final int BG = 0xFFF6F0E9;
-    private static final int HEADER = 0xFFFFFAF5;
-    private static final int PANEL = 0xFFFFFAF5;
-    private static final int WELL = 0xFFF0E7E2;
-    private static final int BORDER = 0xFFE4D6D2;
-    private static final int TEXT = 0xFF291D3C;
-    private static final int MUTED = 0xFF695A70;
-    private static final int ACCENT = 0xFF823D5F;
-    private static final int ACCENT_SURFACE = 0xFFF0DAE3;
-    private static final int WARNING = 0xFF9A422C;
-    private static final int DANGER = 0xFFF6DDDA;
+    private int BG, HEADER, PANEL, WELL, BORDER, TEXT, MUTED, ACCENT, ACCENT_SURFACE, WARNING, DANGER, ON_ACCENT;
+    private boolean dark;
+    private int appearance;
+    private static final String[] THEMES = {"Sistema", "Blanco", "Oscuro"};
+    private static final int INK = 0xFF291D3C;
     private static final int PEACH = 0xFFFFB295;
     private static final int ON_INK = 0xFFFFF6EC;
     private static final int HOME = 0, REMOTE = 1, MONITOR = 2, CONTROLS = 3, CONNECTION = 4;
@@ -154,6 +148,10 @@ public final class MainActivity extends Activity {
     private NavItem[] navigation;
     private DesktopView desktop;
     private OrbitArtwork orbit;
+    private Icon pcBatteryIcon, deviceBatteryIcon, speakerIcon;
+    private boolean phoneCharging;
+    private boolean waitingForMonitor;
+    private Button tailscale, pasteRoute;
     private LatencyHistory history;
     private Button homeOpen, viewerHandle;
     private TextView homeImageProfile, historyStatus, viewerStats, viewerAudio, viewerNotice;
@@ -172,6 +170,7 @@ public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle restored) {
         super.onCreate(restored);
         preferences = getSharedPreferences("pc-link", MODE_PRIVATE);
+        appearance = bounded(preferences.getInt("appearance", 0), 2);
         fingerprint = preferences.getString("fingerprint", null);
         computer = preferences.getString("computer", "");
         mode = ReceiverLink.Mode.values()[bounded(preferences.getInt("mode", 0), 2)];
@@ -245,6 +244,10 @@ public final class MainActivity extends Activity {
 
     @Override public void onConfigurationChanged(Configuration updated) {
         super.onConfigurationChanged(updated);
+        rebuildUi();
+    }
+
+    private void rebuildUi() {
         rememberFields();
         desktop.endGesture();
         dismissViewerDialogs();
@@ -254,6 +257,20 @@ public final class MainActivity extends Activity {
 
     private void buildUi() {
         Configuration current = getResources().getConfiguration();
+        dark = appearance == 2 || (appearance == 0 && (current.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
+        BG = dark ? 0xFF19151F : 0xFFFDFBFC;
+        HEADER = dark ? 0xFF201B26 : Color.WHITE;
+        PANEL = dark ? 0xFF29232F : Color.WHITE;
+        WELL = dark ? 0xFF342D3C : 0xFFF5F0F4;
+        BORDER = dark ? 0xFF524559 : 0xFFE4D8DE;
+        TEXT = dark ? 0xFFF8F1F5 : INK;
+        MUTED = dark ? 0xFFCCBBC9 : 0xFF665968;
+        ACCENT = dark ? 0xFFF2AFC5 : 0xFF833A5C;
+        ACCENT_SURFACE = dark ? 0xFF4D3043 : 0xFFF8DFE8;
+        ON_ACCENT = dark ? INK : Color.WHITE;
+        WARNING = dark ? 0xFFFFBF9F : 0xFF933F26;
+        DANGER = dark ? 0xFF593539 : 0xFFF9DFDD;
+        history.colors(BORDER, ACCENT);
         wide = current.screenWidthDp >= 700;
         root = new FrameLayout(this);
         root.setBackgroundColor(BG);
@@ -298,10 +315,20 @@ public final class MainActivity extends Activity {
         head.addView(brand, brandParams);
         phoneLabel = text("", 11, MUTED, true);
         phoneLabel.setPadding(dp(6), 0, dp(8), 0);
-        if (wide) head.addView(phoneLabel);
+        if (wide) head.addView(devicePower());
         badge = pill("Sin conexión", MUTED, WELL);
         badge.setOnClickListener(view -> showPage(CONNECTION, true));
         head.addView(badge);
+        Button appearanceButton = button("", false);
+        appearanceButton.setPadding(0, 0, 0, 0);
+        appearanceButton.setContentDescription("Apariencia · " + THEMES[appearance]);
+        appearanceButton.setOnClickListener(view -> chooseTheme());
+        FrameLayout themeSlot = new FrameLayout(this);
+        themeSlot.addView(appearanceButton, new FrameLayout.LayoutParams(-1, -1));
+        themeSlot.addView(new Icon(this, "theme", ACCENT), new FrameLayout.LayoutParams(dp(23), dp(23), Gravity.CENTER));
+        LinearLayout.LayoutParams styleSize = lp(dp(48), dp(48));
+        styleSize.setMarginStart(dp(7));
+        head.addView(themeSlot, styleSize);
         shell.addView(head, lp(-1, -2));
 
         LinearLayout body = wide ? horizontal() : vertical();
@@ -355,19 +382,39 @@ public final class MainActivity extends Activity {
         if (page == HOME) orbit.post(orbit::enter);
     }
 
+    private AlertDialog.Builder dialog() {
+        return new AlertDialog.Builder(this, dark ? android.R.style.Theme_Material_Dialog_Alert : android.R.style.Theme_Material_Light_Dialog_Alert);
+    }
+
+    private void chooseTheme() {
+        dialog().setTitle("Apariencia").setSingleChoiceItems(THEMES, appearance, (picker, choice) -> {
+            picker.dismiss();
+            if (choice == appearance) return;
+            appearance = choice;
+            preferences.edit().putInt("appearance", choice).apply();
+            rebuildUi();
+        }).setNegativeButton("Cerrar", null).show();
+    }
+
     private View homePage() {
         LinearLayout content = page(null);
         LinearLayout overview = vertical();
         FrameLayout hero = new FrameLayout(this);
-        hero.setBackground(gradientSurface(new int[]{TEXT, 0xFF432A54}, 24, 0));
+        hero.setBackground(gradientSurface(new int[]{INK, 0xFF432A54}, 24, 0));
         orbit = new OrbitArtwork(this);
         hero.addView(orbit, new FrameLayout.LayoutParams(dp(wide ? 212 : 175), dp(155), Gravity.TOP | Gravity.END));
         LinearLayout device = vertical();
         device.setPadding(dp(19), dp(16), dp(19), dp(18));
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.proyector_icon);
-        logo.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        device.addView(logo, lp(dp(51), dp(51)));
+        if (wide) {
+            Icon station = new Icon(this, "screen", PEACH);
+            device.addView(station, lp(dp(32), dp(32)));
+        } else {
+            phoneLabel = text("", 12, ON_INK, true);
+            phoneLabel.setPadding(dp(5), 0, 0, 0);
+            View power = devicePower();
+            deviceBatteryIcon.tint(PEACH);
+            device.addView(power);
+        }
         homeComputer = editorial("Tu computadora", 30, ON_INK);
         homeComputer.setMaxLines(2);
         homeComputer.setEllipsize(TextUtils.TruncateAt.END);
@@ -375,7 +422,7 @@ public final class MainActivity extends Activity {
         homeStatus = text("", 13, 0xFFE5CDD8, false);
         add(device, homeStatus, 5);
         homeOpen = button("Vincular PC", true);
-        homeOpen.setTextColor(TEXT);
+        homeOpen.setTextColor(INK);
         homeOpen.setBackground(tappable(PEACH, 12, 0));
         homeOpen.setOnClickListener(view -> {
             if (state == ReceiverLink.State.CONNECTED) openViewer(Wire.DESKTOP, DesktopView.Mode.DIRECT);
@@ -407,9 +454,10 @@ public final class MainActivity extends Activity {
 
         LinearLayout actions = vertical();
         actions.addView(editorial("Accesos rápidos", 24, TEXT));
-        add(actions, actionRow("touch", "Panel táctil", "Mueve el cursor con un deslizamiento", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD)), 8);
-        add(actions, actionRow("screen", "Solo ver", "Amplía la imagen con dos dedos", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 6);
-        add(actions, actionRow("dual", "Segundo monitor", "Abre una pantalla adicional", () -> showPage(MONITOR, true)), 6);
+        add(actions, tilePair(featureTile("touch", "Panel táctil", "Mover el cursor", false,
+                        () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD)),
+                featureTile("dual", "Segundo monitor", "Extender Windows", true, () -> showPage(MONITOR, true))), 9);
+        add(actions, actionRow("eye", "Solo ver", "Amplía la imagen con dos dedos", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 8);
         add(actions, actionRow("sliders", "Controles", "Volumen, multimedia y energía", () -> showPage(CONTROLS, true)), 6);
         LinearLayout imageProfile = card(true);
         imageProfile.addView(title("Calidad de imagen  ›", 15));
@@ -419,10 +467,6 @@ public final class MainActivity extends Activity {
         imageProfile.setOnClickListener(view -> showPage(REMOTE, true));
         pressMotion(imageProfile);
         add(actions, imageProfile, 8);
-        if (!wide) {
-            phoneLabel = text("", 12, MUTED, true);
-            add(actions, phoneLabel, 10);
-        }
         if (wide) add(overview, linkHealth, 10);
         add(content, columns(overview, actions), 0);
         if (!wide) add(content, linkHealth, 13);
@@ -434,7 +478,7 @@ public final class MainActivity extends Activity {
         profileTiles.clear();
         add(content, tilePair(actionRow("screen", "Control directo", "Toca para usar Windows", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.DIRECT)),
                 actionRow("touch", "Panel táctil", "Desliza para mover el cursor", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD))), 13);
-        add(content, actionRow("screen", "Solo ver", "Observa y amplía la pantalla sin enviar toques", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 7);
+        add(content, actionRow("eye", "Solo ver", "Observa y amplía la pantalla sin enviar toques", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 7);
         LinearLayout video = card(false);
         video.addView(title("Calidad de imagen", 17));
         adaptiveSwitch = new Switch(this);
@@ -450,14 +494,14 @@ public final class MainActivity extends Activity {
         });
         add(video, adaptiveSwitch, 4);
         qualityButton = button("", false);
-        qualityButton.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Resolución máxima")
+        qualityButton.setOnClickListener(view -> dialog().setTitle("Resolución máxima")
                 .setSingleChoiceItems(Wire.RESOLUTIONS, quality, (dialog, selected) -> {
                     quality = selected;
                     saveVideoSettings();
                     dialog.dismiss();
                 }).setNegativeButton("Cancelar", null).show());
         rateButton = button("", false);
-        rateButton.setOnClickListener(view -> new AlertDialog.Builder(this).setTitle("Fluidez máxima")
+        rateButton.setOnClickListener(view -> dialog().setTitle("Fluidez máxima")
                 .setSingleChoiceItems(new String[]{"12 FPS", "20 FPS", "30 FPS", "45 FPS", "60 FPS"}, frameRate, (dialog, selected) -> {
                     frameRate = selected;
                     saveVideoSettings();
@@ -521,14 +565,25 @@ public final class MainActivity extends Activity {
         monitorHint = text("", 14, MUTED, false);
         add(card, monitorHint, 6);
         startSecond = button("Abrir a pantalla completa", true);
-        startSecond.setOnClickListener(view -> openViewer(Wire.SECOND_DISPLAY, DesktopView.Mode.DIRECT));
+        startSecond.setOnClickListener(view -> monitorAction());
         add(card, startSecond, 12);
         LinearLayout help = card(false);
         help.addView(title("Preparar el escritorio extendido", 17));
-        add(help, text("En Windows, abre Configuración de pantallas y selecciona Extender cuando el sistema detecte la pantalla adicional.", 14, MUTED, false), 8);
-        add(help, text("Para crear una pantalla virtual, Windows necesita un controlador de pantalla firmado. Este paquete permite usar una pantalla que ya esté activa.", 14, MUTED, false), 8);
+        add(help, text("En Orbivía para Windows, abre Pantallas. Si tienes una sola pantalla, pulsa Preparar monitor virtual y elige Install en Virtual Driver Control.", 14, MUTED, false), 8);
+        add(help, text("Pulsa Extender escritorio en la PC. Cuando aparezca la pantalla adicional, podrás mover ventanas hacia ella con Win + Mayús + Flecha.", 14, MUTED, false), 8);
         add(content, columns(card, help), 13);
         return scroll(content);
+    }
+
+    private void monitorAction() {
+        if (state != ReceiverLink.State.CONNECTED) {
+            showPage(CONNECTION, true);
+        } else if (!secondary.isEmpty()) {
+            openViewer(Wire.SECOND_DISPLAY, DesktopView.Mode.DIRECT);
+        } else {
+            waitingForMonitor = !waitingForMonitor;
+            refresh();
+        }
     }
 
     private View controlsPage() {
@@ -606,7 +661,8 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < names.length; i++) {
             ReceiverLink.Mode selection = ReceiverLink.Mode.values()[i];
             modeButtons[i] = button(names[i], false);
-            modeButtons[i].setTextSize(12);
+            modeButtons[i].setTextSize(13);
+            decorate(modeButtons[i], new String[]{"wifi", "usb", "globe"}[i], true);
             modeButtons[i].setOnClickListener(view -> selectMode(selection));
             LinearLayout.LayoutParams p = weighted(1f);
             if (i > 0) p.setMarginStart(dp(5));
@@ -618,6 +674,12 @@ public final class MainActivity extends Activity {
         usbSettings = button("Abrir ajustes de USB", false);
         usbSettings.setOnClickListener(view -> openUsbSettings());
         add(card, usbSettings, 8);
+        tailscale = button("Abrir Tailscale", false);
+        tailscale.setOnClickListener(view -> openTailscale());
+        add(card, tailscale, 6);
+        pasteRoute = button("Pegar dirección de la PC", false);
+        pasteRoute.setOnClickListener(view -> pasteRoute());
+        add(card, pasteRoute, 6);
         discovery = text("", 13, ACCENT, true);
         add(card, discovery, 10);
         pin = field("Código de 6 dígitos", InputType.TYPE_CLASS_NUMBER);
@@ -658,8 +720,8 @@ public final class MainActivity extends Activity {
             address.setText("127.0.0.1");
             port.setText(Integer.toString(Wire.PORT));
             refreshConnection();
-            new AlertDialog.Builder(this).setTitle("USB directo con ADB")
-                    .setMessage("Si ya configuraste ADB en Windows y autorizaste tu PC, ejecuta adb reverse tcp:5050 tcp:5050. Después escribe el código y pulsa Conectar.")
+            dialog().setTitle("USB directo con ADB")
+                    .setMessage("En Orbivía para Windows abre Red y pulsa Preparar cable ADB. Autoriza la PC en Android si se solicita. Después escribe el código aquí y pulsa Conectar.")
                     .setPositiveButton("Entendido", null).show();
         });
         add(card, adb, 7);
@@ -726,7 +788,7 @@ public final class MainActivity extends Activity {
         } else {
             String[] choices = new String[candidates.size()];
             for (int i = 0; i < choices.length; i++) choices[i] = candidates.get(i).computer + "  ·  " + candidates.get(i).address();
-            new AlertDialog.Builder(this).setTitle("Elige tu computadora")
+            dialog().setTitle("Elige tu computadora")
                     .setItems(choices, (dialog, which) -> beginAutomatic(candidates.get(which)))
                     .setNegativeButton("Cancelar", null).show();
         }
@@ -768,6 +830,33 @@ public final class MainActivity extends Activity {
         refresh();
     }
 
+    private void openTailscale() {
+        Intent launch = getPackageManager().getLaunchIntentForPackage("com.tailscale.ipn");
+        try {
+            startActivity(launch != null ? launch : new Intent(Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://tailscale.com/download/android")));
+        } catch (RuntimeException unavailable) {
+            showConnectionMessage("Instala o abre Tailscale y conecta ambos equipos a la misma cuenta o red privada.", true);
+        }
+    }
+
+    private void pasteRoute() {
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        android.content.ClipData data = clipboard == null ? null : clipboard.getPrimaryClip();
+        CharSequence text = data == null || data.getItemCount() == 0 ? null : data.getItemAt(0).getText();
+        String[] endpoint = text == null || text.length() > 64 ? new String[0] : text.toString().trim().split(":", -1);
+        if (endpoint.length < 1 || endpoint.length > 2 || validAddress(endpoint[0], mode) == null
+                || (endpoint.length == 2 && portNumber(endpoint[1]) < 0)) {
+            showConnectionMessage("En Red del emisor, copia la dirección de esta conexión con su puerto.", true);
+            return;
+        }
+        manual = true;
+        address.setText(endpoint[0]);
+        port.setText(endpoint.length == 2 ? endpoint[1] : Integer.toString(Wire.PORT));
+        showConnectionMessage("Dirección preparada. Introduce el código de Windows.", false);
+        pin.requestFocus();
+    }
+
     private void openUsbSettings() {
         try { startActivity(new Intent("android.settings.TETHER_SETTINGS")); }
         catch (RuntimeException unsupported) {
@@ -800,13 +889,15 @@ public final class MainActivity extends Activity {
         if (connect == null) return;
         for (int i = 0; i < modeButtons.length; i++) {
             boolean selected = mode.ordinal() == i;
+            if (Boolean.valueOf(selected).equals(modeButtons[i].getTag())) continue;
+            modeButtons[i].setTag(selected);
             modeButtons[i].setTextColor(selected ? ACCENT : TEXT);
             modeButtons[i].setBackground(tappable(selected ? ACCENT_SURFACE : WELL, 10, selected ? ACCENT : BORDER));
             modeButtons[i].setSelected(selected);
         }
         routeHint.setText(mode == ReceiverLink.Mode.LAN ? "Conecta Android y Windows a la misma red."
-                : mode == ReceiverLink.Mode.USB ? "Usa un cable de datos y activa Compartir Internet por USB."
-                : "Conecta ambos equipos a Tailscale e introduce la IP que figura en el emisor.");
+                : mode == ReceiverLink.Mode.USB ? "Conecta un cable de datos, abre los ajustes de USB y activa Compartir Internet por USB. La PC aparecerá debajo."
+                : "Abre Tailscale en los dos equipos con la misma cuenta. Copia la dirección Tailscale desde Red en el emisor e introdúcela aquí.");
         List<ReceiverLink.Endpoint> candidates = discoveredDevices();
         discovery.setVisibility(mode == ReceiverLink.Mode.VPN ? View.GONE : View.VISIBLE);
         discovery.setText(candidates.isEmpty() ? "Buscando la PC…" : candidates.size() == 1
@@ -814,6 +905,12 @@ public final class MainActivity extends Activity {
                 : candidates.size() + " PC disponibles");
         boolean busy = state != ReceiverLink.State.IDLE;
         boolean usb = mode == ReceiverLink.Mode.USB;
+        tailscale.setVisibility(mode == ReceiverLink.Mode.VPN ? View.VISIBLE : View.GONE);
+        pasteRoute.setVisibility(mode == ReceiverLink.Mode.VPN || manual ? View.VISIBLE : View.GONE);
+        pasteRoute.setEnabled(!busy);
+        for (Button route : modeButtons) route.setEnabled(!busy);
+        adb.setEnabled(!busy);
+        manualToggle.setEnabled(!busy);
         usbSettings.setVisibility(usb ? View.VISIBLE : View.GONE);
         adb.setVisibility(usb ? View.VISIBLE : View.GONE);
         boolean showIp = manual || mode == ReceiverLink.Mode.VPN;
@@ -840,6 +937,8 @@ public final class MainActivity extends Activity {
         int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 0);
         if (level >= 0 && scale > 0) phoneBattery = bounded(Math.round(level * 100f / scale), 100);
+        phoneCharging = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0;
+        paintPowerIcons();
         if (phoneLabel != null && phoneBattery >= 0) {
             phoneLabel.setText("Android " + phoneBattery + " %");
             phoneLabel.setContentDescription("Batería de Android " + phoneBattery + " por ciento");
@@ -850,6 +949,7 @@ public final class MainActivity extends Activity {
         if (homeStatus == null) return;
         boolean connected = state == ReceiverLink.State.CONNECTED;
         orbit.connectionChanged(connected);
+        paintPowerIcons();
         homeOpen.setText(connected ? "Abrir escritorio  →" : "Vincular PC  →");
         String route = linkedMode == ReceiverLink.Mode.USB ? "USB" : linkedMode == ReceiverLink.Mode.VPN ? "Tailscale" : "red local";
         badge.setText(connected ? "Conectado" : state == ReceiverLink.State.IDLE ? "Sin conexión" : "Conectando");
@@ -879,10 +979,11 @@ public final class MainActivity extends Activity {
         result.setTextColor(commandError ? WARNING : MUTED);
         result.setVisibility(result.length() == 0 ? View.GONE : View.VISIBLE);
         monitorHint.setText(!connected ? "Conecta tu PC para detectar sus pantallas."
-                : secondary.isEmpty() ? "Windows no detecta una pantalla adicional activa."
+                : secondary.isEmpty() ? monitorCount > 1 ? "En Pantallas de Orbivía para Windows, elige el monitor que quieres usar." : "Windows tiene una sola pantalla activa."
                 : secondary + "  ·  " + monitorCount + " pantallas detectadas");
-        startSecond.setEnabled(connected && !secondary.isEmpty());
-        startSecond.setAlpha(startSecond.isEnabled() ? 1f : .52f);
+        if (waitingForMonitor) monitorHint.setText("Esperando la pantalla. Deja esta pestaña abierta mientras la preparas en Windows.");
+        startSecond.setText(!connected ? "Conectar la PC" : !secondary.isEmpty() ? "Abrir segundo monitor"
+                : waitingForMonitor ? "Cancelar espera" : "Abrir cuando esté lista");
         refreshQuality();
         refreshConnection();
         refreshViewerTools();
@@ -951,11 +1052,25 @@ public final class MainActivity extends Activity {
             pages[i].setVisibility(i == index ? View.VISIBLE : View.GONE);
             navigation[i].active(i == index);
         }
+        if (index != MONITOR && waitingForMonitor) {
+            waitingForMonitor = false;
+            refresh();
+        }
         page = index;
         View current = pages[page];
         current.setAlpha(entering ? .15f : 1f);
         current.setTranslationX(entering ? direction * dp(18) : 0f);
         if (entering) {
+            if (current instanceof ScrollView) {
+                LinearLayout content = (LinearLayout) ((ScrollView) current).getChildAt(0);
+                for (int i = 0; i < Math.min(4, content.getChildCount()); i++) {
+                    View item = content.getChildAt(i);
+                    item.animate().cancel();
+                    item.setTranslationY(dp(8));
+                    item.animate().translationY(0).setStartDelay(i * 22L).setDuration(190)
+                            .setInterpolator(new DecelerateInterpolator()).start();
+                }
+            }
             current.animate().alpha(1f).translationX(0f).setDuration(255)
                     .setInterpolator(new DecelerateInterpolator()).start();
             if (index == HOME) orbit.enter();
@@ -983,6 +1098,7 @@ public final class MainActivity extends Activity {
         dismissViewerDialogs();
         desktop.endGesture();
         viewing = Wire.PAUSED;
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         configureStream();
         setViewerVisibility();
         refreshQuality();
@@ -1007,7 +1123,7 @@ public final class MainActivity extends Activity {
             if (controller != null) {
                 int lightBars = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
                         | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-                controller.setSystemBarsAppearance(active ? 0 : lightBars, lightBars);
+                controller.setSystemBarsAppearance(active || dark ? 0 : lightBars, lightBars);
                 controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                 if (active) controller.hide(WindowInsets.Type.systemBars());
                 else controller.show(WindowInsets.Type.systemBars());
@@ -1015,10 +1131,10 @@ public final class MainActivity extends Activity {
         } else {
             int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             if (active) flags |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-            else {
+            else if (!dark) {
                 flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
                 if (Build.VERSION.SDK_INT >= 26) flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-                else getWindow().setNavigationBarColor(TEXT);
+                else getWindow().setNavigationBarColor(INK);
             }
             getWindow().getDecorView().setSystemUiVisibility(flags);
             getWindow().setStatusBarColor(Color.TRANSPARENT);
@@ -1122,6 +1238,13 @@ public final class MainActivity extends Activity {
         viewerNotice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(body, viewerNotice, 3);
 
+        Button rotate = viewerAction("Girar el visor", () -> {
+            viewerDialog.dismiss();
+            boolean landscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+            setRequestedOrientation(landscape ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                    : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        });
+        add(body, rotate, 9);
         viewerCapture = viewerAction("Guardar captura", () -> {
             Bitmap frame = desktop.currentFrame();
             viewerDialog.dismiss();
@@ -1133,7 +1256,7 @@ public final class MainActivity extends Activity {
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(body);
-        viewerDialog = new AlertDialog.Builder(this)
+        viewerDialog = dialog()
                 .setTitle(viewing == Wire.SECOND_DISPLAY ? "Segundo monitor" : "Escritorio remoto")
                 .setView(scroll)
                 .setNeutralButton("Salir del visor", (dialog, which) -> closeViewer())
@@ -1213,7 +1336,7 @@ public final class MainActivity extends Activity {
         if (!gotFrame || textDialog != null || viewerMode == DesktopView.Mode.VIEW_ONLY) return;
         EditText input = field("Texto para Windows", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(512)});
-        textDialog = new AlertDialog.Builder(this).setTitle("Escribir en la PC").setView(input)
+        textDialog = dialog().setTitle("Escribir en la PC").setView(input)
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Enviar", (window, which) -> {
                     String value = input.getText().toString();
@@ -1262,7 +1385,9 @@ public final class MainActivity extends Activity {
                 history.clear();
                 volume = battery = -1;
                 muted = false;
+                monitorCount = 0;
                 secondary = "";
+                waitingForMonitor = false;
                 if ("Esperando respuesta de Windows…".equals(command)) {
                     command = "La conexión se interrumpió antes de que Windows respondiera.";
                     commandError = true;
@@ -1285,7 +1410,7 @@ public final class MainActivity extends Activity {
             identity.setTypeface(Typeface.MONOSPACE);
             add(display, text("Busca «Identidad de este equipo» en el emisor de Windows. Acepta si los cuatro grupos coinciden exactamente.", 15, TEXT, false), 0);
             add(display, identity, 11);
-            verifyDialog = new AlertDialog.Builder(MainActivity.this).setTitle("Verificar PC").setView(display)
+            verifyDialog = dialog().setTitle("Verificar PC").setView(display)
                     .setPositiveButton("Coincide", (dialog, which) -> decision.answer(true))
                     .setNegativeButton("Cancelar", (dialog, which) -> decision.answer(false)).create();
             verifyDialog.setOnDismissListener(dialog -> { decision.answer(false); verifyDialog = null; });
@@ -1313,6 +1438,10 @@ public final class MainActivity extends Activity {
         @Override public void screens(int count, String target) {
             monitorCount = count;
             secondary = target;
+            if (waitingForMonitor && !target.isEmpty() && foreground && page == MONITOR && state == ReceiverLink.State.CONNECTED) {
+                waitingForMonitor = false;
+                openViewer(Wire.SECOND_DISPLAY, DesktopView.Mode.DIRECT);
+            }
             if (viewing == Wire.SECOND_DISPLAY && target.isEmpty()) {
                 closeViewer();
                 showPage(MONITOR, true);
@@ -1347,10 +1476,21 @@ public final class MainActivity extends Activity {
 
     private Button control(String label, int command, String confirmation, List<View> group) {
         Button button = button(label, false);
+        String symbol;
+        switch (command) {
+            case Wire.MUTE: symbol = "mute"; break;
+            case Wire.VOLUME_UP: symbol = "volume"; break;
+            case Wire.VOLUME_DOWN: symbol = "volume-low"; break;
+            case Wire.LOCK: symbol = "lock"; break;
+            case Wire.SLEEP: symbol = "sleep"; break;
+            case Wire.RESTART: symbol = "restart"; break;
+            default: symbol = "power";
+        }
+        decorate(button, symbol, false);
         if (command == Wire.SHUTDOWN) button.setBackground(tappable(DANGER, 11, BORDER));
         button.setOnClickListener(view -> {
             if (confirmation == null) execute(command);
-            else new AlertDialog.Builder(this).setTitle(button.getText()).setMessage(confirmation)
+            else dialog().setTitle(button.getText()).setMessage(confirmation)
                     .setNegativeButton("Cancelar", null).setPositiveButton("Confirmar", (dialog, which) -> execute(command)).show();
         });
         group.add(button);
@@ -1359,6 +1499,8 @@ public final class MainActivity extends Activity {
 
     private Button shortcut(String label, int shortcut) {
         Button action = button(label, false);
+        String[] icons = {"", "screen", "dual", "sliders", "play", "prev", "next"};
+        decorate(action, icons[shortcut], shortcut >= 4);
         action.setContentDescription("Enviar atajo de Windows: " + label);
         action.setOnClickListener(view -> execute(Wire.SHORTCUT, shortcut));
         shortcutButtons.add(action);
@@ -1381,17 +1523,77 @@ public final class MainActivity extends Activity {
         return option;
     }
 
+    private View devicePower() {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        deviceBatteryIcon = new Icon(this, "battery", ACCENT);
+        row.addView(deviceBatteryIcon, lp(dp(24), dp(24)));
+        row.addView(phoneLabel);
+        return row;
+    }
+
+    private void paintPowerIcons() {
+        if (deviceBatteryIcon != null) deviceBatteryIcon.battery(phoneBattery, phoneCharging, animationsEnabled());
+        if (pcBatteryIcon != null) pcBatteryIcon.battery(battery, charging && battery >= 0, animationsEnabled());
+        if (speakerIcon != null) speakerIcon.symbol(muted ? "mute" : volume < 45 ? "volume-low" : "volume");
+    }
+
+    private View featureTile(String symbol, String heading, String detail, boolean warm, Runnable action) {
+        LinearLayout tile = vertical();
+        int fill = warm ? (dark ? 0xFF422F32 : 0xFFFFE8D9) : ACCENT_SURFACE;
+        int ink = warm ? (dark ? 0xFFFFC5AA : 0xFF75391F) : ACCENT;
+        tile.setBackground(tappable(fill, 20, 0));
+        tile.setPadding(dp(13), dp(12), dp(13), dp(13));
+        LinearLayout top = horizontal();
+        top.addView(new Icon(this, symbol, ink), lp(dp(29), dp(29)));
+        TextView arrow = text("↗", 17, ink, true);
+        arrow.setGravity(Gravity.END);
+        top.addView(arrow, weighted(1));
+        tile.addView(top);
+        TextView name = text(heading, 15, TEXT, true);
+        add(tile, name, 8);
+        add(tile, text(detail, 12, ink, false), 1);
+        tile.setContentDescription(heading + ". " + detail);
+        tile.setFocusable(true);
+        tile.setOnClickListener(view -> action.run());
+        pressMotion(tile);
+        return tile;
+    }
+
     private View metricCard(String icon, String label, TextView value) {
         LinearLayout metric = vertical();
         metric.setPadding(dp(8), dp(10), dp(8), dp(10));
         metric.setGravity(Gravity.CENTER_HORIZONTAL);
         Icon glyph = new Icon(this, icon, ACCENT);
-        metric.addView(glyph, lp(dp(20), dp(20)));
+        if (icon.equals("battery")) pcBatteryIcon = glyph;
+        if (icon.equals("volume")) speakerIcon = glyph;
+        glyph.setBackground(surface(ACCENT_SURFACE, 14, 0));
+        glyph.setPadding(dp(6), dp(6), dp(6), dp(6));
+        metric.addView(glyph, lp(dp(36), dp(36)));
         TextView caption = text(label, 11, MUTED, true);
         caption.setGravity(Gravity.CENTER);
         value.setGravity(Gravity.CENTER);
         add(metric, value, 4);
         add(metric, caption, 1);
+        metric.setFocusable(true);
+        metric.setBackground(tappable(PANEL, 16, 0));
+        metric.setOnClickListener(view -> {
+            if (icon.equals("volume")) showPage(CONTROLS, true);
+            else if (icon.equals("latency")) {
+                ScrollView scroll = (ScrollView) pages[HOME];
+                android.graphics.Rect area = new android.graphics.Rect();
+                history.getDrawingRect(area);
+                scroll.offsetDescendantRectToMyCoords(history, area);
+                scroll.smoothScrollTo(0, Math.max(0, area.top - dp(64)));
+                history.announceForAccessibility(historyStatus.getText());
+            } else {
+                String pc = state != ReceiverLink.State.CONNECTED ? "Sin conexión" : battery < 0 ? "Sin lectura" : battery + " %" + (charging ? " · Con alimentación" : " · En batería");
+                String android = phoneBattery < 0 ? "Sin lectura" : phoneBattery + " %" + (phoneCharging ? " · Con alimentación" : " · En batería");
+                dialog().setTitle("Baterías").setMessage("Windows   " + pc + "\n\nAndroid   " + android)
+                        .setPositiveButton("Cerrar", null).show();
+            }
+        });
+        pressMotion(metric);
         return metric;
     }
 
@@ -1489,19 +1691,31 @@ public final class MainActivity extends Activity {
         result.setAllCaps(false);
         result.setTextSize(14);
         result.setPadding(dp(6), dp(7), dp(6), dp(7));
-        result.setMinHeight(dp(45));
-        result.setMinimumHeight(dp(45));
+        result.setMinHeight(dp(48));
+        result.setMinimumHeight(dp(48));
         result.setMinimumWidth(0);
         result.setMinWidth(0);
         result.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         result.setTextColor(new ColorStateList(new int[][]{{-android.R.attr.state_enabled}, {}},
-                new int[]{MUTED, primary ? ON_INK : TEXT}));
+                new int[]{MUTED, primary ? ON_ACCENT : TEXT}));
         pressMotion(result);
         StateListDrawable fill = new StateListDrawable();
         fill.addState(new int[]{-android.R.attr.state_enabled}, surface(WELL, 12, BORDER));
         fill.addState(new int[0], tappable(primary ? ACCENT : WELL, 12, primary ? ACCENT : BORDER));
         result.setBackground(fill);
         return result;
+    }
+
+    private void decorate(Button button, String symbol, boolean stacked) {
+        android.graphics.drawable.Drawable glyph = Icon.drawable(symbol, ACCENT, dp(stacked ? 23 : 21));
+        button.setCompoundDrawablePadding(dp(stacked ? 3 : 7));
+        if (stacked) button.setCompoundDrawables(null, glyph, null, null);
+        else {
+            button.setPadding(dp(12), dp(8), dp(12), dp(8));
+            button.setCompoundDrawablesRelative(glyph, null, null, null);
+        }
+        button.setCompoundDrawableTintList(new ColorStateList(new int[][]{{-android.R.attr.state_enabled}, {}},
+                new int[]{MUTED, ACCENT}));
     }
 
     private EditText field(String placeholder, int inputType) {
@@ -1573,7 +1787,7 @@ public final class MainActivity extends Activity {
     }
 
     private RippleDrawable tappable(int color, int radius, int stroke) {
-        return new RippleDrawable(ColorStateList.valueOf(0x35823D5F), surface(color, radius, stroke), surface(Color.WHITE, radius, 0));
+        return new RippleDrawable(ColorStateList.valueOf(dark ? 0x40FFC9DE : 0x30823D5F), surface(color, radius, stroke), surface(Color.WHITE, radius, 0));
     }
 
     private LinearLayout vertical() { LinearLayout column = new LinearLayout(this); column.setOrientation(LinearLayout.VERTICAL); return column; }

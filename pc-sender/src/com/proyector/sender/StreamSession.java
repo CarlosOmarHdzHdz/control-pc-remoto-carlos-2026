@@ -66,6 +66,7 @@ final class StreamSession {
         long nextTopologyCheck = 0;
         long nextFrame = 0;
         long meterStarted = System.nanoTime();
+        boolean captureWarning = false;
         int sent = 0;
         int frames = 0;
         try (FrameEncoder encoder = new FrameEncoder()) {
@@ -93,10 +94,17 @@ final class StreamSession {
                     }
                     if (request != previous || !DisplayCapture.matches(capture, choice)) {
                         clearViewport();
-                        capture = choice == null ? null : new DisplayCapture(choice);
+                        capture = null;
+                        if (choice != null) {
+                            try { capture = new DisplayCapture(choice); }
+                            catch (AWTException | IllegalArgumentException | SecurityException unavailable) {
+                                if (!captureWarning) notice(false, "Windows está reorganizando la pantalla. Volviendo a intentar…");
+                                captureWarning = true;
+                            }
+                        }
                         if (capture == null) {
                             onVideo.accept("Imagen en pausa");
-                            if (request.mode != Wire.PAUSED && request == view) {
+                            if (choice == null && request.mode != Wire.PAUSED && request == view) {
                                 output.writeInt(Wire.NOTICE);
                                 output.writeBoolean(false);
                                 output.writeUTF(request.mode == Wire.SECOND_DISPLAY ? "Windows no tiene una segunda pantalla activa."
@@ -132,7 +140,17 @@ final class StreamSession {
                 }
 
                 long started = System.nanoTime();
-                BufferedImage image = capture.read(resolution);
+                BufferedImage image;
+                try {
+                    image = capture.read(resolution);
+                    captureWarning = false;
+                } catch (IllegalArgumentException | SecurityException unavailable) {
+                    clearViewport();
+                    capture = null;
+                    if (!captureWarning) notice(false, "La pantalla cambió. Windows está recuperando la imagen.");
+                    captureWarning = true;
+                    continue;
+                }
                 int[] size = FrameEncoder.fit(image.getWidth(), image.getHeight(), resolution);
                 try { encoder.encode(image, resolution, request.automatic); }
                 finally { image.flush(); }
@@ -163,7 +181,7 @@ final class StreamSession {
                     frames = 0;
                 }
             }
-        } catch (IOException | AWTException | RuntimeException error) {
+        } catch (IOException | RuntimeException error) {
             if (!socket.isClosed()) onVideo.accept("Sesión de imagen interrumpida");
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
@@ -301,7 +319,11 @@ final class StreamSession {
     }
 
     private void queryWindows(int operation, int percent) {
-        controls.request(operation, percent, () -> !socket.isClosed(), this::notice);
+        controls.request(operation, percent, () -> !socket.isClosed(), (ok, message) -> {
+            // A failed background read invalidates the meters. Keep feedback on user commands independent.
+            if (!ok && operation == Wire.STATUS) notice(true, "STAT:NA:0:NA:0");
+            else notice(ok, message);
+        });
     }
 
     private void notice(boolean ok, String message) {

@@ -4,10 +4,10 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** Extrae la carpeta completa del ZIP y abre `Orbivia\Orbivia.exe`. Conserva las carpetas `app` y `runtime` junto al ejecutable. [Descargar Orbivía para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.12.0/downloads/Orbivia-Windows-1.12.0.zip)
-- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar la vinculación. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.12.0/downloads/Orbivia-Android-1.12.0.apk)
+- **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Con el emisor activo, cerrar la ventana lo minimiza. **Salir** termina la aplicación. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.13.0/downloads/Orbivia-Windows-1.13.0.msi)
+- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.13.0/downloads/Orbivia-Android-1.13.0.apk)
 
-Orbivía 1.12.0 añade herramientas dentro del visor, capturas PNG y un gráfico de la respuesta de la conexión. El emisor de Windows guarda la pantalla seleccionada, los límites de imagen y el puerto que funcionó en la última sesión. [Sumas SHA-256](downloads/SHA256SUMS-1.12.0.txt)
+En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector de la barra lateral. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. En el visor puedes girar la imagen desde **Herramientas → Girar el visor**. [Sumas SHA-256](downloads/SHA256SUMS-1.13.0.txt)
 
 ## Conectar
 
@@ -19,9 +19,9 @@ Orbivía 1.12.0 añade herramientas dentro del visor, capturas PNG y un gráfico
 | --- | --- |
 | **Wi-Fi / LAN** | Conecta ambos equipos a la misma red privada. Android busca la PC automáticamente. Si el router bloquea la detección, escribe la IP que muestra el emisor. |
 | **Cable USB** | Usa un cable de datos y activa **Compartir Internet por USB** en Android. El botón **Abrir ajustes de USB** te lleva al ajuste disponible en tu dispositivo. Si la detección no aparece, escribe la IP de la interfaz USB que muestra Windows. |
-| **Otra red** | Instala Tailscale en ambos equipos, conéctalos a la misma red privada y escribe en Android la IP que Windows identifica como **Tailscale**. La PC debe estar encendida con el emisor activo. |
+| **Otra red** | Abre Tailscale en ambos equipos con la misma red privada. En **Red** del emisor, copia la dirección **Tailscale**. En Android, **Otra red → Pegar dirección de la PC** admite la IP y el puerto juntos. También puedes escribirlos. La PC debe estar encendida con el emisor activo. |
 
-Si ya usas ADB con la PC autorizada, puedes elegir **USB directo (ADB)**. Con el puerto predeterminado, ejecuta en Windows `adb reverse tcp:5050 tcp:5050` y conecta Android a `127.0.0.1:5050`. El modo **Cable USB** mediante conexión compartida funciona sin depuración USB cuando el teléfono ofrece esa opción.
+**Cable de datos con depuración USB.** Si ya usas Android Platform Tools, conecta un único teléfono por USB y autoriza esta PC en Android. En el emisor iniciado abre **Red → Preparar cable ADB**. En Android elige **Cable USB → Usar USB directo (ADB)** e introduce el código. Orbivía prepara el puerto automáticamente aunque el emisor use un puerto distinto de 5050. También puedes usar conexión compartida sin instalar ADB.
 
 Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo con detección automática, acepta la nueva IP de la misma PC cuando recibe su anuncio y verifica que su identidad siga siendo la misma. Si reinicias el emisor, usa el código nuevo.
 
@@ -38,9 +38,9 @@ Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo co
 
 ## Segundo monitor
 
-En el emisor, abre **Configuración de pantallas**. Si Windows tiene una pantalla adicional activa, selecciona **Extender** y elige esa pantalla en **Segundo monitor**. Abre **Monitor** en Android para ver esa pantalla a tamaño completo y arrastrar ventanas hacia ella desde la PC.
-
-Para crear una pantalla virtual en una computadora que solo tiene una pantalla activa, Windows necesita un controlador de pantalla firmado. Este paquete admite pantallas adicionales que Windows ya reconoce. [Modelo de controlador de pantalla indirecta de Microsoft](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/indirect-display-driver-model-overview).
+1. Conecta Orbivía y abre **Monitor** en Android. Si Windows ya tiene una segunda pantalla activa, toca **Abrir segundo monitor**. Si estás preparando una pantalla, toca **Abrir cuando esté lista** y deja esa pestaña abierta.
+2. Si la PC solo tiene una pantalla, ve a **Pantallas → Preparar monitor virtual** en Orbivía para Windows. La primera vez WinGet obtiene **Virtual Driver Control**, que requiere Internet. En esa herramienta elige el controlador de pantalla y pulsa **Install**. Windows puede solicitar permisos de administrador. Si WinGet no está disponible, el asistente ofrece la descarga oficial. [Virtual Display Driver](https://github.com/VirtualDrivers/Virtual-Display-Driver/releases/latest)
+3. Pulsa **Extender escritorio** en el emisor. Si Windows detecta varias pantallas adicionales, elige la que quieras mostrar en el teléfono. Para organizar su posición en Windows, abre **Configuración de pantallas**. Mueve la ventana activa a la pantalla contigua con **Win + Mayús + Flecha**. Para retirar el controlador virtual, abre Virtual Driver Control y elige **Uninstall**.
 
 ## Seguridad
 
@@ -50,11 +50,11 @@ Usa **Otra red** con Tailscale para conectarte desde Internet. Mantén el puerto
 
 ## Compilar desde el código
 
-Usa JDK 21, .NET Framework 4 en Windows y Android SDK 35 con Build Tools 37.0.0. Los scripts aceptan `JAVA_HOME` y `ANDROID_SDK_ROOT`.
+Usa JDK 21, .NET Framework 4 en Windows y Android SDK 35 con Build Tools 37.0.0. La creación del MSI también requiere WiX 3.14 en el PATH. Los scripts aceptan `JAVA_HOME` y `ANDROID_SDK_ROOT`.
 
 ```powershell
 & .\pc-sender\build.ps1
-& .\pc-sender\package.ps1
+& .\pc-sender\package.ps1 -Installer
 & .\android-receiver\build.ps1
 ```
 

@@ -1,0 +1,2 @@
+78efb130a1ab0519faf11fc058e9868a55672ec0a0129b91fafdbc477739a2a2  Orbivia-Android-1.13.0.apk
+420fb83de24faeb7b188668fe76e7ecd44916716f5c00ec04075bac8e487f430  Orbivia-Windows-1.13.0.msi

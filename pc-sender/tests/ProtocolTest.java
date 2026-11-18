@@ -43,6 +43,10 @@ public final class ProtocolTest {
                 androidHost(identity);
                 return;
             }
+            displaySelection();
+            check(HostNetwork.usbInterface("Remote NDIS based Internet Sharing Device")
+                    && HostNetwork.usbInterface("Dispositivo NDIS remoto")
+                    && !HostNetwork.usbInterface("Intel Wi-Fi 6"), "Reconocer los adaptadores de anclaje USB");
             captureGeometry();
             automaticQuality();
             WindowsControl audio = new WindowsControl();
@@ -74,6 +78,16 @@ public final class ProtocolTest {
             Files.deleteIfExists(key);
             Files.deleteIfExists(directory);
         }
+    }
+
+    private static void displaySelection() {
+        Displays.Choice main = new Displays.Choice("primary", "Principal", true, new Rectangle(1920, 1080), null);
+        Displays.Choice tablet = new Displays.Choice("new-id", "Tableta", false, new Rectangle(1920, 0, 1080, 1920), null);
+        Displays.Choice extra = new Displays.Choice("other", "Otra", false, new Rectangle(-800, 0, 800, 600), null);
+        check(new Displays(java.util.List.of(main)).secondary("stale") == null, "Solo pantalla principal");
+        check(new Displays(java.util.List.of(main, tablet)).secondary("stale") == tablet, "Recuperar el único monitor tras reconectar");
+        Displays multiple = new Displays(java.util.List.of(main, tablet, extra));
+        check(multiple.secondary("stale") == null && multiple.secondary("other") == extra, "Respetar la selección cuando hay varias pantallas");
     }
 
     private static void captureGeometry() throws Exception {

@@ -13,6 +13,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.net.BindException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -20,14 +21,39 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 
 public final class Main {
-    private static final Color BACKGROUND = new Color(0xF6F0E9);
-    private static final Color CARD = new Color(0xFFFAF5);
-    private static final Color WELL = new Color(0xF0E7E2);
-    private static final Color BORDER = new Color(0xE4D6D2);
-    private static final Color TEXT = new Color(0x291D3C);
-    private static final Color MUTED = new Color(0x695A70);
-    private static final Color ACCENT = new Color(0x823D5F);
-    private static final Color AMBER = new Color(0x9A422C);
+    private static final Color INK = new Color(0x291D3C);
+    private static final Color[] LIGHT = palette(0xFDFBFC, 0xFFFFFF, 0xF5F0F4, 0xE4D8DE, 0x291D3C, 0x665968, 0x833A5C, 0x933F26);
+    private static final Color[] DARK = palette(0x19151F, 0x29232F, 0x342D3C, 0x524559, 0xF8F1F5, 0xCCBBC9, 0xF2AFC5, 0xFFBF9F);
+    private static Color BACKGROUND, CARD, WELL, BORDER, TEXT, MUTED, ACCENT, AMBER;
+    private static Color[] currentPalette = LIGHT;
+    static { usePalette(LIGHT); }
+
+    private static Color[] palette(int... rgb) {
+        return java.util.Arrays.stream(rgb).mapToObj(Color::new).toArray(Color[]::new);
+    }
+
+    private static void usePalette(Color[] colors) {
+        currentPalette = colors;
+        BACKGROUND = colors[0]; CARD = colors[1]; WELL = colors[2]; BORDER = colors[3];
+        TEXT = colors[4]; MUTED = colors[5]; ACCENT = colors[6]; AMBER = colors[7];
+    }
+
+    private static Color mapped(Color value, Color[] from) {
+        for (int i = 0; i < from.length; i++) if (value == from[i]) return currentPalette[i];
+        return value;
+    }
+
+    private static void recolor(Component part, Color[] from) {
+        if (part instanceof Surface surface) {
+            surface.fill = mapped(surface.fill, from);
+            surface.border = mapped(surface.border, from);
+        }
+        part.setBackground(mapped(part.getBackground(), from));
+        part.setForeground(mapped(part.getForeground(), from));
+        if (part instanceof JComboBox<?> combo) combo.updateUI();
+        if (part instanceof Container group) for (Component child : group.getComponents()) recolor(child, from);
+    }
+
     private static final Color PEACH = new Color(0xFFB295);
     private static final Color ON_INK = new Color(0xFFF6EC);
     private static final Color SUBTLE_INK = new Color(0xE5CDD8);
@@ -39,11 +65,9 @@ public final class Main {
             return;
         }
         SwingUtilities.invokeLater(() -> {
-            UIManager.put("ComboBox.background", WELL);
-            UIManager.put("ComboBox.foreground", TEXT);
-            UIManager.put("ComboBox.selectionBackground", new Color(0xF0DAE3));
-            UIManager.put("ComboBox.selectionForeground", TEXT);
-            UIManager.put("ComboBox.font", new Font("Segoe UI", Font.PLAIN, 13));
+            int theme = Preferences.userRoot().node("/orbivia/sender").getInt("appearance", 0);
+            usePalette(theme == 2 || (theme == 0 && systemDark()) ? DARK : LIGHT);
+            comboColors();
             try { new SenderWindow().setVisible(true); }
             catch (RuntimeException error) {
                 error.printStackTrace();
@@ -51,6 +75,27 @@ public final class Main {
                         "Error de inicio de Orbivía", JOptionPane.ERROR_MESSAGE);
             }
         });
+    }
+
+    private static void comboColors() {
+        UIManager.put("ComboBox.background", WELL);
+        UIManager.put("ComboBox.foreground", TEXT);
+        UIManager.put("ComboBox.selectionBackground", WELL);
+        UIManager.put("ComboBox.selectionForeground", TEXT);
+        UIManager.put("ComboBox.font", new Font("Segoe UI", Font.PLAIN, 13));
+        UIManager.put("OptionPane.background", CARD);
+        UIManager.put("Panel.background", CARD);
+        UIManager.put("OptionPane.messageForeground", TEXT);
+    }
+
+    private static boolean systemDark() {
+        try {
+            Process query = new ProcessBuilder(ConnectionSetup.windowsTool("reg.exe").toString(), "query",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            if (!query.waitFor(1200, java.util.concurrent.TimeUnit.MILLISECONDS)) { query.destroyForcibly(); return false; }
+            return new String(query.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.US_ASCII).trim().endsWith("0x0");
+        } catch (Exception unavailable) { return false; }
     }
 
     private static final class SenderWindow extends JFrame {
@@ -72,6 +117,8 @@ public final class Main {
         private final JComboBox<Option> secondary = new JComboBox<>();
         private final JComboBox<String> resolution = new JComboBox<>(Wire.RESOLUTIONS.clone());
         private final JComboBox<String> fps = new JComboBox<>(new String[]{"12 FPS", "20 FPS", "30 FPS", "45 FPS", "60 FPS"});
+        private final JButton usbSetup = button("Preparar cable ADB", false);
+        private final JButton virtualSetup = button("Preparar monitor virtual", true);
         private final JPanel routes = column();
         private final CardLayout layout = new CardLayout();
         private final MotionPane section = new MotionPane(layout);
@@ -80,6 +127,8 @@ public final class Main {
                 preferences.get("desktop", ""), preferences.get("secondary", ""),
                 Math.clamp(preferences.getInt("quality", 3), 0, Wire.RESOLUTIONS.length - 1),
                 Wire.FRAME_RATES[Math.clamp(preferences.getInt("rateIndex", 4), 0, Wire.FRAME_RATES.length - 1)]));
+        private final JComboBox<String> appearance = new JComboBox<>(new String[]{"Sistema", "Blanco", "Oscuro"});
+        private int themeGeneration;
         private HostIdentity identity;
         private HostServer server;
         private int serverGeneration;
@@ -90,9 +139,9 @@ public final class Main {
 
         SenderWindow() {
             super("Orbivía · Emisor");
-            setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
             setMinimumSize(new Dimension(660, 510));
-            setSize(906, 554);
+            setSize(938, 610);
             setLocationByPlatform(true);
             setIconImage(mark(48));
 
@@ -127,13 +176,44 @@ public final class Main {
             refreshHardware();
             refresh.start();
             addWindowListener(new WindowAdapter() {
+                @Override public void windowActivated(WindowEvent event) { if (appearance.getSelectedIndex() == 0) updateAppearance(); }
+                @Override public void windowClosing(WindowEvent event) {
+                    if (server == null) dispose();
+                    else {
+                        setExtendedState(getExtendedState() | Frame.ICONIFIED);
+                        showMessage("El emisor sigue en la barra de tareas. Usa Salir para cerrarlo.", false);
+                    }
+                }
                 @Override public void windowClosed(WindowEvent event) { refresh.stop(); section.motion.stop(); stopServer(); }
             });
             loadIdentity();
         }
 
+        private void updateAppearance() {
+            int choice = appearance.getSelectedIndex();
+            int generation = ++themeGeneration;
+            preferences.putInt("appearance", choice);
+            if (choice == 0) {
+                WindowsControl.daemon(() -> {
+                    boolean dark = systemDark();
+                    SwingUtilities.invokeLater(() -> { if (generation == themeGeneration && isDisplayable()) applyAppearance(dark); });
+                }, "windows-theme").start();
+            } else applyAppearance(choice == 2);
+        }
+
+        private void applyAppearance(boolean dark) {
+            Color[] next = dark ? DARK : LIGHT;
+            Color[] previous = currentPalette;
+            if (next == previous) return;
+            usePalette(next);
+            comboColors();
+            recolor(getContentPane(), previous);
+            port.setCaretColor(ACCENT);
+            repaint();
+        }
+
         private JPanel sidebar() {
-            JPanel side = new Surface(TEXT, new Color(0x432A54), 24);
+            JPanel side = new Surface(INK, new Color(0x432A54), 24);
             side.setLayout(new BoxLayout(side, BoxLayout.Y_AXIS));
             side.setBorder(BorderFactory.createEmptyBorder(20, 16, 18, 16));
             side.setPreferredSize(new Dimension(211, 0));
@@ -149,6 +229,8 @@ public final class Main {
             for (int i = 0; i < SECTIONS.length; i++) {
                 int index = i;
                 JButton tab = new StyledButton(SECTIONS[i], false, true);
+                tab.setIcon(new SectionIcon(i));
+                tab.setIconTextGap(10);
                 tab.setHorizontalAlignment(SwingConstants.LEADING);
                 tab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
                 tab.addActionListener(event -> selectSection(index, true));
@@ -156,9 +238,18 @@ public final class Main {
                 addSpaced(side, tab, i == 0 ? 11 : 5);
             }
             side.add(Box.createVerticalGlue());
+            appearance.setSelectedIndex(Math.clamp(preferences.getInt("appearance", 0), 0, 2));
+            appearance.getAccessibleContext().setAccessibleName("Apariencia");
+            appearance.setMaximumSize(new Dimension(160, 30));
+            appearance.addActionListener(event -> updateAppearance());
+            addSpaced(side, label("Apariencia", 12, SUBTLE_INK, false), 8);
+            addSpaced(side, appearance, 3);
             addSpaced(side, connection, 10);
             addSpaced(side, video, 4);
             addSpaced(side, videoLimit, 4);
+            JButton exit = new StyledButton("Salir", false, true);
+            exit.addActionListener(event -> dispose());
+            addSpaced(side, exit, 8);
             return side;
         }
 
@@ -185,7 +276,7 @@ public final class Main {
             JPanel card = card();
             addSpaced(card, editorial("Vincular Android", 29, TEXT), 0);
             addSpaced(card, label("Inicia el emisor y abre Conexión en Android.", 12, MUTED, false), 6);
-            JPanel codeWell = new Surface(TEXT, new Color(0x432A54), 17);
+            JPanel codeWell = new Surface(INK, new Color(0x432A54), 17);
             codeWell.setLayout(new BorderLayout(10, 0));
             codeWell.setBorder(BorderFactory.createEmptyBorder(8, 13, 8, 10));
             pin.setFont(new Font("Consolas", Font.BOLD, 40));
@@ -219,6 +310,19 @@ public final class Main {
             addSpaced(card, field("Vista de escritorio", desktop), 10);
             addSpaced(card, field("Segundo monitor", secondary), 8);
             addSpaced(card, displayHint, 6);
+            JPanel prepare = new JPanel(new GridLayout(1, 2, 7, 0));
+            prepare.setOpaque(false);
+            virtualSetup.addActionListener(event -> prepareMonitor());
+            JButton extend = button("Extender escritorio", false);
+            extend.addActionListener(event -> {
+                try {
+                    new ProcessBuilder(ConnectionSetup.windowsTool("DisplaySwitch.exe").toString(), "/extend").start();
+                    showMessage("Windows está preparando el escritorio extendido.", false);
+                } catch (IOException failure) { showMessage("Pulsa Win + P y elige Extender.", true); }
+            });
+            prepare.add(virtualSetup);
+            prepare.add(extend);
+            addSpaced(card, prepare, 8);
             JPanel limits = new JPanel(new GridLayout(1, 2, 10, 0));
             limits.setOpaque(false);
             limits.add(field("Resolución máxima", resolution));
@@ -244,11 +348,66 @@ public final class Main {
             return card;
         }
 
+        private void openPage(String url) {
+            try { Desktop.getDesktop().browse(URI.create(url)); }
+            catch (IOException | UnsupportedOperationException failure) { showMessage("Abre " + url, true); }
+        }
+
+        private void prepareMonitor() {
+            int choice = JOptionPane.showConfirmDialog(this,
+                    "Se abrirá Virtual Driver Control. Si hace falta, WinGet descargará la herramienta de VirtualDrivers.\n"
+                    + "Elige el controlador de pantalla y pulsa Install. Windows puede pedirte permiso.\n"
+                    + "Después vuelve aquí y pulsa Extender escritorio.", "Preparar monitor virtual",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE);
+            if (choice != JOptionPane.OK_OPTION) return;
+            virtualSetup.setEnabled(false);
+            showMessage("Preparando Virtual Driver Control…", false);
+            WindowsControl.daemon(() -> {
+                try {
+                    Desktop.getDesktop().open(ConnectionSetup.installControl().toFile());
+                    SwingUtilities.invokeLater(() -> showMessage("En Virtual Driver Control, instala o activa el controlador de pantalla.", false));
+                } catch (Exception failure) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (!isDisplayable()) return;
+                        showMessage("Virtual Driver Control está disponible en la página oficial.", true);
+                        if (JOptionPane.showConfirmDialog(this, "WinGet no pudo abrir la herramienta. ¿Abrir la descarga oficial?",
+                                "Monitor virtual", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) openPage(ConnectionSetup.DRIVER_PAGE);
+                    });
+                } finally { SwingUtilities.invokeLater(() -> virtualSetup.setEnabled(true)); }
+            }, "prepare-monitor").start();
+        }
+
+        private void prepareCable() {
+            if (server == null) { showMessage("Inicia el emisor para preparar el cable.", true); return; }
+            HostServer current = server;
+            usbSetup.setEnabled(false);
+            WindowsControl.daemon(() -> {
+                String message;
+                boolean failed = false;
+                try { message = ConnectionSetup.prepareUsb(current.port()); }
+                catch (Exception failure) { message = failure instanceof IOException ? failure.getMessage() : "La preparación se interrumpió."; failed = true; }
+                String result = message;
+                boolean error = failed;
+                SwingUtilities.invokeLater(() -> { usbSetup.setEnabled(server != null); if (server == current) showMessage(result, error); });
+            }, "prepare-cable").start();
+        }
+
         private JPanel networkCard() {
             JPanel card = card();
             addSpaced(card, editorial("Direcciones de red", 29, TEXT), 0);
             addSpaced(card, label("Usa la dirección correspondiente para una conexión manual.", 12, MUTED, false), 5);
             addSpaced(card, routes, 10);
+            addSpaced(card, label("Cable USB", 16, TEXT, true), 15);
+            addSpaced(card, label("<html>Conecta un cable de datos y activa Compartir Internet por USB en Android. La nueva dirección aparecerá arriba.</html>", 13, MUTED, false), 4);
+            usbSetup.setToolTipText("Para teléfonos con depuración USB autorizada y Android Platform Tools en Windows");
+            usbSetup.setEnabled(false);
+            usbSetup.addActionListener(event -> prepareCable());
+            addSpaced(card, usbSetup, 6);
+            addSpaced(card, label("Otra red", 16, TEXT, true), 13);
+            addSpaced(card, label("<html>Conecta ambos equipos a Tailscale. Copia la dirección Tailscale y pégala en Conexión → Otra red en Android.</html>", 13, MUTED, false), 4);
+            JButton vpn = button("Obtener Tailscale", false);
+            vpn.addActionListener(event -> openPage("https://tailscale.com/download/windows"));
+            addSpaced(card, vpn, 6);
             return card;
         }
 
@@ -299,6 +458,7 @@ public final class Main {
                 String digits = host.pin();
                 pin.setText(digits.substring(0, 3) + " " + digits.substring(3));
                 copyPin.setEnabled(true);
+                usbSetup.setEnabled(true);
                 toggle.setText("Detener emisor");
                 port.setEnabled(false);
                 setConnection("Esperando Android", false);
@@ -324,6 +484,7 @@ public final class Main {
             video.setText("Imagen en pausa");
             pin.setText("··· ···");
             port.setEnabled(true);
+            usbSetup.setEnabled(false);
             toggle.setText("Iniciar emisor");
             copyPin.setEnabled(false);
             showMessage("El emisor está detenido.", false);
@@ -355,10 +516,11 @@ public final class Main {
                     }
                 }
                 select(desktop, desiredDesktop);
-                select(secondary, desiredSecondary);
+                Displays.Choice resolved = displays.secondary(desiredSecondary);
+                select(secondary, !desiredSecondary.isEmpty() && resolved != null ? resolved.id() : desiredSecondary);
                 loadingDisplays = false;
                 displayHint.setText(displays.secondary(desiredSecondary) == null
-                        ? "Sin pantalla adicional activa en Windows" : "Pantalla adicional disponible");
+                        ? displaysHint(displays) : "Pantalla adicional lista · " + displays.secondary(desiredSecondary).name());
             }
             List<HostNetwork.Route> active = HostNetwork.routes();
             if (!active.equals(currentRoutes) || routes.getComponentCount() == 0) {
@@ -370,14 +532,19 @@ public final class Main {
                     JPanel row = new JPanel(new BorderLayout(10, 0));
                     row.setOpaque(false);
                     row.add(label(route.label() + "   ·   " + ip, 13, TEXT, true), BorderLayout.CENTER);
-                    JButton copy = button("Copiar IP", false);
-                    copy.addActionListener(event -> copy(ip, "IP copiada"));
+                    JButton copy = button("Copiar dirección", false);
+                    copy.addActionListener(event -> copy(ip + ":" + (server == null ? port.getText().trim() : server.port()), "Dirección y puerto copiados"));
                     row.add(copy, BorderLayout.EAST);
                     addSpaced(routes, row, 5);
                 }
                 routes.revalidate();
                 routes.repaint();
             }
+        }
+
+        private String displaysHint(Displays displays) {
+            return displays.choices().size() > 1 ? "Elige una de las pantallas adicionales disponibles."
+                    : "Una pantalla activa. Prepara un monitor virtual o conecta otra pantalla.";
         }
 
         private void updateSettings() {
@@ -476,7 +643,7 @@ public final class Main {
         Graphics2D graphics = icon.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         graphics.scale(size / 108.0, size / 108.0);
-        graphics.setColor(TEXT);
+        graphics.setColor(INK);
         graphics.fillRoundRect(4, 4, 100, 100, 50, 50);
         Path2D ring = new Path2D.Float();
         ring.moveTo(71, 27);
@@ -531,8 +698,8 @@ public final class Main {
     }
 
     private static final class Surface extends JPanel {
-        private final Color fill;
-        private final Color border;
+        private Color fill;
+        private Color border;
         private final int radius;
         Surface(Color fill, Color border, int radius) { this.fill = fill; this.border = border; this.radius = radius; setOpaque(false); }
         @Override protected void paintComponent(Graphics source) {
@@ -583,6 +750,33 @@ public final class Main {
         }
     }
 
+    private record SectionIcon(int section) implements Icon {
+        @Override public int getIconWidth() { return 22; }
+        @Override public int getIconHeight() { return 22; }
+        @Override public void paintIcon(Component target, Graphics source, int x, int y) {
+            Graphics2D g = (Graphics2D) source.create();
+            g.translate(x, y);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(PEACH);
+            g.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            switch (section) {
+                case 0 -> {
+                    g.rotate(-.65, 11, 11);
+                    g.drawRoundRect(1, 7, 9, 8, 5, 5); g.drawRoundRect(12, 7, 9, 8, 5, 5); g.drawLine(7, 11, 15, 11);
+                }
+                case 1 -> {
+                    g.drawRoundRect(1, 3, 16, 12, 3, 3); g.drawLine(4, 18, 10, 18);
+                    g.setColor(INK); g.fillRoundRect(13, 9, 8, 12, 2, 2);
+                    g.setColor(PEACH); g.drawRoundRect(13, 9, 8, 12, 2, 2);
+                }
+                default -> {
+                    g.drawOval(2, 2, 18, 18); g.drawOval(7, 2, 8, 18); g.drawLine(3, 11, 19, 11);
+                }
+            }
+            g.dispose();
+        }
+    }
+
     private static final class StyledButton extends JButton {
         private final boolean accent;
         private final boolean sidebar;
@@ -611,7 +805,7 @@ public final class Main {
         @Override protected void paintComponent(Graphics source) {
             Graphics2D graphics = (Graphics2D) source.create();
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color base = sidebar ? isSelected() ? ACCENT : TEXT : accent && isEnabled() ? ACCENT : WELL;
+            Color base = sidebar ? isSelected() ? LIGHT[6] : INK : accent && isEnabled() ? LIGHT[6] : WELL;
             int light = (int) (18 * hover) - (getModel().isPressed() ? 13 : 0);
             graphics.setColor(new Color(channel(base.getRed(), light), channel(base.getGreen(), light), channel(base.getBlue(), light)));
             graphics.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 11, 11);

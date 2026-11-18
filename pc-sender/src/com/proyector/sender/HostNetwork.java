@@ -17,6 +17,12 @@ final class HostNetwork {
 
     private HostNetwork() { }
 
+    static boolean usbInterface(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT);
+        return normalized.contains("usb") || normalized.contains("rndis") || normalized.contains("ncm")
+                || (normalized.contains("ndis") && (normalized.contains("remote") || normalized.contains("remoto")));
+    }
+
     static List<Route> routes() {
         List<Route> routes = new ArrayList<>();
         try {
@@ -31,7 +37,7 @@ final class HostNetwork {
                     if (Wire.isVpnAddress(address) && name.contains("tailscale")) {
                         routes.add(new Route(address, null, "VPN", "Tailscale"));
                     } else if (Wire.isLocalAddress(address) && candidate.getBroadcast() != null) {
-                        boolean usb = name.contains("rndis") || name.contains("usb") || name.contains("ncm");
+                        boolean usb = usbInterface(name);
                         boolean wireless = name.contains("wireless") || name.contains("wi-fi") || name.contains("wlan");
                         routes.add(new Route(address, candidate.getBroadcast(), usb ? "USB" : "LAN",
                                 usb ? "Cable USB" : wireless ? "Wi-Fi" : "Red local"));

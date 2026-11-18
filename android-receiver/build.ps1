@@ -42,7 +42,7 @@ $generated = Join-Path $out 'generated'
 New-Item -ItemType Directory -Force -Path $generated | Out-Null
 & (Join-Path $buildTools 'aapt2.exe') compile --dir (Join-Path $project 'res') -o $compiledResources
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo compilar los recursos' }
-& (Join-Path $buildTools 'aapt2.exe') link --auto-add-overlay -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --java $generated --min-sdk-version 23 --target-sdk-version 35 --version-code 14 --version-name 1.12.0 -o $unsigned
+& (Join-Path $buildTools 'aapt2.exe') link --auto-add-overlay -R $compiledResources --manifest (Join-Path $project 'AndroidManifest.xml') -I $platform --java $generated --min-sdk-version 23 --target-sdk-version 35 --version-code 15 --version-name 1.13.0 -o $unsigned
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 no pudo crear el APK base' }
 
 $sources = @(Get-ChildItem -Path (Join-Path $project 'src'), (Join-Path $project '..\shared\src'), $generated -Recurse -Filter '*.java' -File | Select-Object -ExpandProperty FullName)

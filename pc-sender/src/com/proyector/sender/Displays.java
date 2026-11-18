@@ -17,7 +17,7 @@ final class Displays {
 
     private final List<Choice> choices;
 
-    private Displays(List<Choice> choices) { this.choices = choices; }
+    Displays(List<Choice> choices) { this.choices = List.copyOf(choices); }
 
     static Displays read() {
         GraphicsEnvironment graphics = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -50,7 +50,11 @@ final class Displays {
 
     Choice secondary(String selection) {
         if (selection != null && !selection.isEmpty()) {
-            return choices.stream().filter(display -> !display.primary && display.id.equals(selection)).findFirst().orElse(null);
+            Choice selected = choices.stream().filter(display -> !display.primary && display.id.equals(selection)).findFirst().orElse(null);
+            if (selected != null) return selected;
+            // Replugging can change the Windows device ID. Only substitute an unambiguous display.
+            List<Choice> available = choices.stream().filter(display -> !display.primary).toList();
+            return available.size() == 1 ? available.get(0) : null;
         }
         return choices.stream().filter(display -> !display.primary).findFirst().orElse(null);
     }
