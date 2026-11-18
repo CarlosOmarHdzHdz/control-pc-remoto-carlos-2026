@@ -1,0 +1,2 @@
+89210333dfc06aa70ab58dbb0d395f44366b188dc21bd37019031c72c1dff752  ProyectorReceiver-1.10.0.apk
+fc00f51669f0b4d2a1cccb0b14d3ced8f9a1fc5dbc3b445d214321117e3c4c66  ProyectorSender-Windows-1.10.0.zip
