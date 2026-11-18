@@ -40,6 +40,7 @@ final class StreamSession {
     private final ArrayDeque<Message> messages = new ArrayDeque<>();
     private final Map<Integer, SentFrame> inFlight = new LinkedHashMap<>();
     private final AdaptiveVideo video = new AdaptiveVideo();
+    private boolean sentVpnRoute;
     private volatile ViewRequest view = new ViewRequest(0, Wire.PAUSED, 2, 30, true);
     private Viewport viewport;
     private Robot pointer;
@@ -202,6 +203,7 @@ final class StreamSession {
                         enqueue(out -> { out.writeInt(Wire.PONG); out.writeLong(time); });
                     }
                     case Wire.VIEW -> readView();
+                    case Wire.REQUEST_VPN_ROUTE -> sendVpnRoute();
                     case Wire.FRAME_ACK -> acknowledge(input.readInt());
                     case Wire.VOLUME_SET -> {
                         int percent = input.readInt();
@@ -221,6 +223,15 @@ final class StreamSession {
         } catch (IOException | AWTException | RuntimeException ignored) {
             // A malformed or interrupted connection is closed and any drag is released.
         } finally { close(); }
+    }
+
+    private void sendVpnRoute() {
+        if (sentVpnRoute) return;
+        sentVpnRoute = true;
+        String address = HostNetwork.routes().stream().filter(route -> "VPN".equals(route.type()))
+                .map(route -> route.address().getHostAddress()).findFirst().orElse("");
+        int port = socket.getLocalPort();
+        enqueue(out -> { out.writeInt(Wire.VPN_ROUTE); out.writeUTF(address); out.writeInt(port); });
     }
 
     private void readView() throws IOException {

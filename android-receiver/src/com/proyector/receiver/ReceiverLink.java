@@ -49,6 +49,7 @@ final class ReceiverLink implements AutoCloseable {
         void verify(String code, Approval approval);
         void linked(String computer, String fingerprint, Endpoint endpoint, Mode mode);
         void screens(int count, String secondary);
+        void vpnRoute(String address, int port);
         void result(boolean ok, String message);
         void latency(long millis);
         void frame(Bitmap image, int revision, int sequence);
@@ -291,6 +292,9 @@ final class ReceiverLink implements AutoCloseable {
                     connection = next;
                     next.start();
                     next.sendView(view);
+                    if (token.startsWith(Wire.ROUTE_TOKEN_PREFIX)) {
+                        next.enqueue(out -> out.writeInt(Wire.REQUEST_VPN_ROUTE), false);
+                    }
                 }
                 Connection linked = next;
                 current(desired, linked, () -> {
@@ -346,6 +350,16 @@ final class ReceiverLink implements AutoCloseable {
                     String secondary = input.readUTF();
                     if (count < 1 || count > 64 || secondary.length() > 128) throw new IOException("Pantallas inválidas");
                     current(desired, link, () -> ui.screens(count, secondary));
+                    break;
+                }
+                case Wire.VPN_ROUTE: {
+                    String address = input.readUTF();
+                    int port = input.readInt();
+                    if (port < 1024 || port > 65535 ||
+                            (!address.isEmpty() && (address.length() > 15 || !Wire.isVpnAddress(Wire.parseAddress(address))))) {
+                        throw new IOException("Ruta privada inválida");
+                    }
+                    current(desired, link, () -> ui.vpnRoute(address, port));
                     break;
                 }
                 case Wire.NOTICE: {

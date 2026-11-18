@@ -152,10 +152,16 @@ public final class MainActivity extends Activity {
     private boolean phoneCharging;
     private boolean waitingForMonitor;
     private Button tailscale, pasteRoute;
+    private TextView savedRouteHint;
     private LatencyHistory history;
     private Button homeOpen, viewerHandle;
+    private LinearLayout viewerDock, viewerPanel;
+    private TextView viewerSummary;
+    private final Button[] quickModes = new Button[DesktopView.Mode.values().length];
+    private Button quickKeyboard, quickCapture, quickDisplay;
+    private boolean viewerExpanded;
     private TextView homeImageProfile, historyStatus, viewerStats, viewerAudio, viewerNotice;
-    private Button viewerLower, viewerRaise, viewerMute, viewerCapture, viewerKeyboard;
+    private Button viewerLower, viewerRaise, viewerMute;
     private TextView badge, phoneLabel, homeComputer, homeStatus, homeBattery, homeVolume, homeLatency;
     private TextView result, resolutionHint, measurement, profileHint, pointerSpeedLabel, monitorHint, videoHint, volumeLabel, discovery, connectionStatus, routeHint;
     private Button connect, manualToggle, usbSettings, adb, forget, startSecond, mute, qualityButton, rateButton;
@@ -286,14 +292,16 @@ public final class MainActivity extends Activity {
                 shell.setPadding(insets.getSystemWindowInsetLeft(), insets.getStableInsetTop(),
                         insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             }
-            View viewerButton = viewerHandle;
+            View viewerButton = viewerDock;
             if (viewerButton != null) {
                 FrameLayout.LayoutParams placement = (FrameLayout.LayoutParams) viewerButton.getLayoutParams();
                 android.view.DisplayCutout cutout = Build.VERSION.SDK_INT >= 28 ? insets.getDisplayCutout() : null;
                 int right = cutout == null ? 0 : cutout.getSafeInsetRight();
                 int left = cutout == null ? 0 : cutout.getSafeInsetLeft();
                 int top = dp(10) + (cutout == null ? 0 : cutout.getSafeInsetTop());
-                if (placement.topMargin != top || placement.rightMargin != right + dp(10) || placement.leftMargin != left + dp(10)) {
+                int width = Math.min(dp(372), getResources().getDisplayMetrics().widthPixels - left - right - dp(22));
+                if (placement.width != width || placement.topMargin != top || placement.rightMargin != right + dp(10) || placement.leftMargin != left + dp(10)) {
+                    placement.width = width;
                     placement.setMargins(left + dp(10), top, right + dp(10), 0);
                     viewerButton.setLayoutParams(placement);
                 }
@@ -365,15 +373,12 @@ public final class MainActivity extends Activity {
         videoHint = text("Preparando imagen…", 15, ON_INK, true);
         videoHint.setGravity(Gravity.CENTER);
         viewerHost.addView(videoHint, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
-        viewerHandle = button("Herramientas  ⋯", false);
-        viewerHandle.setTextSize(12);
-        viewerHandle.setPadding(dp(12), 0, dp(12), 0);
-        viewerHandle.setTextColor(ON_INK);
-        viewerHandle.setBackground(tappable(0xD9291D3C, 18, 0x6AFFB295));
-        viewerHandle.setOnClickListener(view -> openViewerTools());
-        FrameLayout.LayoutParams handlePosition = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
+        viewerDock = buildViewerDock();
+        FrameLayout.LayoutParams handlePosition = new FrameLayout.LayoutParams(
+                Math.min(dp(372), getResources().getDisplayMetrics().widthPixels - dp(22)),
+                -2, Gravity.TOP | Gravity.END);
         handlePosition.setMargins(dp(10), dp(10), dp(10), 0);
-        viewerHost.addView(viewerHandle, handlePosition);
+        viewerHost.addView(viewerDock, handlePosition);
         root.addView(viewerHost, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         showPage(page, false);
@@ -677,6 +682,8 @@ public final class MainActivity extends Activity {
         tailscale = button("Abrir Tailscale", false);
         tailscale.setOnClickListener(view -> openTailscale());
         add(card, tailscale, 6);
+        savedRouteHint = text("", 13, ACCENT, true);
+        add(card, savedRouteHint, 8);
         pasteRoute = button("Pegar dirección de la PC", false);
         pasteRoute.setOnClickListener(view -> pasteRoute());
         add(card, pasteRoute, 6);
@@ -853,6 +860,7 @@ public final class MainActivity extends Activity {
         manual = true;
         address.setText(endpoint[0]);
         port.setText(endpoint.length == 2 ? endpoint[1] : Integer.toString(Wire.PORT));
+        rememberFields();
         showConnectionMessage("Dirección preparada. Introduce el código de Windows.", false);
         pin.requestFocus();
     }
@@ -906,6 +914,9 @@ public final class MainActivity extends Activity {
         boolean busy = state != ReceiverLink.State.IDLE;
         boolean usb = mode == ReceiverLink.Mode.USB;
         tailscale.setVisibility(mode == ReceiverLink.Mode.VPN ? View.VISIBLE : View.GONE);
+        boolean knownPrivateRoute = mode == ReceiverLink.Mode.VPN && validAddress(savedIp, mode) != null;
+        savedRouteHint.setVisibility(knownPrivateRoute ? View.VISIBLE : View.GONE);
+        if (knownPrivateRoute) savedRouteHint.setText("Dirección de tu PC guardada");
         pasteRoute.setVisibility(mode == ReceiverLink.Mode.VPN || manual ? View.VISIBLE : View.GONE);
         pasteRoute.setEnabled(!busy);
         for (Button route : modeButtons) route.setEnabled(!busy);
@@ -1083,6 +1094,7 @@ public final class MainActivity extends Activity {
             showConnectionMessage("Conecta tu PC para abrir el escritorio.", false);
             return;
         }
+        viewerExpanded = false;
         viewing = desired;
         setViewerMode(mode);
         closeKeyboard();
@@ -1098,6 +1110,7 @@ public final class MainActivity extends Activity {
         dismissViewerDialogs();
         desktop.endGesture();
         viewing = Wire.PAUSED;
+        viewerExpanded = false;
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         configureStream();
         setViewerVisibility();
@@ -1195,10 +1208,118 @@ public final class MainActivity extends Activity {
         updateViewerHandle();
     }
 
+    private LinearLayout buildViewerDock() {
+        LinearLayout dock = vertical();
+        viewerHandle = button("Controles del visor  ⋯", false);
+        viewerHandle.setTextSize(13);
+        viewerHandle.setPadding(dp(12), 0, dp(12), 0);
+        viewerHandle.setTextColor(ON_INK);
+        viewerHandle.setBackground(tappable(0xE5291D3C, 16, 0x8AFFB295));
+        viewerHandle.setOnClickListener(view -> toggleViewerDock(!viewerExpanded));
+        dock.addView(viewerHandle, new LinearLayout.LayoutParams(-2, -2, 0f));
+        ((LinearLayout.LayoutParams) viewerHandle.getLayoutParams()).gravity = Gravity.END;
+
+        viewerPanel = vertical();
+        viewerPanel.setPadding(dp(12), dp(10), dp(12), dp(11));
+        viewerPanel.setBackground(gradientSurface(new int[]{0xFF30243A, 0xFF241C30}, 18, 0xFF72536F));
+        viewerPanel.setElevation(dp(8));
+        viewerPanel.setClickable(true);
+        viewerSummary = text("", 12, 0xFFF4D5E0, true);
+        viewerPanel.addView(viewerSummary);
+        LinearLayout modes = horizontal();
+        addQuickMode(modes, "Directo", "touch", DesktopView.Mode.DIRECT);
+        addQuickMode(modes, "Panel táctil", "screen", DesktopView.Mode.TOUCHPAD);
+        addQuickMode(modes, "Solo ver", "eye", DesktopView.Mode.VIEW_ONLY);
+        add(viewerPanel, modes, 8);
+
+        quickKeyboard = dockAction("Teclado", "keyboard", () -> { toggleViewerDock(false); showKeyboard(); });
+        quickCapture = dockAction("Captura", "camera", () -> {
+            toggleViewerDock(false);
+            capture.chooseLocation(this, desktop.currentFrame());
+        });
+        quickDisplay = dockAction("Monitor", "dual", this::switchViewerDisplay);
+        LinearLayout actions = horizontal();
+        addSegment(actions, quickKeyboard);
+        addSegment(actions, quickCapture);
+        addSegment(actions, quickDisplay);
+        add(viewerPanel, actions, 6);
+        LinearLayout tools = horizontal();
+        addSegment(tools, dockAction("Girar", "rotate", this::rotateViewer));
+        addSegment(tools, dockAction("Ajustes", "sliders", () -> {
+            toggleViewerDock(false);
+            openViewerTools();
+        }));
+        addSegment(tools, dockAction("Salir", "exit", this::closeViewer));
+        add(viewerPanel, tools, 6);
+        add(dock, viewerPanel, 6);
+        return dock;
+    }
+
+    private void addQuickMode(LinearLayout row, String label, String icon, DesktopView.Mode mode) {
+        Button item = dockAction(label, icon, () -> {
+            setViewerMode(mode);
+            toggleViewerDock(false);
+        });
+        quickModes[mode.ordinal()] = item;
+        addSegment(row, item);
+    }
+
+    private Button dockAction(String label, String icon, Runnable action) {
+        Button item = viewerAction(label, action);
+        item.setTextSize(12);
+        item.setTextColor(new ColorStateList(new int[][]{{-android.R.attr.state_enabled}, {}},
+                new int[]{0xFFC8B5C8, ON_INK}));
+        item.setBackground(tappable(0xFF43354E, 11, 0));
+        item.setCompoundDrawables(null, Icon.drawable(icon, PEACH, dp(19)), null, null);
+        item.setCompoundDrawablePadding(dp(3));
+        return item;
+    }
+
+    private void toggleViewerDock(boolean expanded) {
+        if (viewerExpanded == expanded) return;
+        desktop.endGesture();
+        viewerExpanded = expanded;
+        updateViewerHandle();
+        viewerPanel.animate().cancel();
+        viewerPanel.setAlpha(1f);
+        viewerPanel.setTranslationY(0f);
+        if (expanded && animationsEnabled()) {
+            viewerPanel.setAlpha(.35f);
+            viewerPanel.setTranslationY(-dp(8));
+            viewerPanel.animate().alpha(1f).translationY(0f).setDuration(185)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        }
+    }
+
     private void updateViewerHandle() {
         if (viewerHandle == null) return;
-        viewerHandle.setText(viewerMode == DesktopView.Mode.VIEW_ONLY ? "Solo ver  ⋯" : "Herramientas  ⋯");
-        viewerHandle.setContentDescription("Herramientas del visor");
+        viewerHandle.setText(viewerExpanded ? "Ocultar controles  ▴" : "Controles del visor  ⋯");
+        viewerPanel.setVisibility(viewerExpanded ? View.VISIBLE : View.GONE);
+        for (Button item : quickModes) {
+            boolean selected = item == quickModes[viewerMode.ordinal()];
+            item.setSelected(selected);
+            item.setBackground(tappable(selected ? 0xFF644154 : 0xFF43354E, 11, selected ? PEACH : 0));
+        }
+        refreshViewerTools();
+    }
+
+    private void rotateViewer() {
+        boolean landscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        setRequestedOrientation(landscape ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+    }
+
+    private void switchViewerDisplay() {
+        if (state != ReceiverLink.State.CONNECTED) return;
+        if (viewing != Wire.SECOND_DISPLAY && secondary.isEmpty()) {
+            closeViewer();
+            showPage(MONITOR, true);
+            return;
+        }
+        toggleViewerDock(false);
+        viewing = viewing == Wire.SECOND_DISPLAY ? Wire.DESKTOP : Wire.SECOND_DISPLAY;
+        configureStream();
+        setViewerVisibility();
     }
 
     private void openViewerTools() {
@@ -1208,12 +1329,6 @@ public final class MainActivity extends Activity {
         body.setPadding(dp(20), dp(8), dp(20), dp(18));
         viewerStats = text("", 14, ACCENT, true);
         body.addView(viewerStats);
-        add(body, title("Control táctil", 15), 14);
-        LinearLayout modes = horizontal();
-        addViewerMode(modes, "Directo", DesktopView.Mode.DIRECT);
-        addViewerMode(modes, "Panel táctil", DesktopView.Mode.TOUCHPAD);
-        addViewerMode(modes, "Solo ver", DesktopView.Mode.VIEW_ONLY);
-        add(body, modes, 5);
         if (viewerMode == DesktopView.Mode.VIEW_ONLY) {
             add(body, text("Pellizca para ampliar y arrastra para recorrer la imagen.", 12, MUTED, false), 6);
             Button zoom = viewerAction("Ampliar", () -> { viewerDialog.dismiss(); desktop.zoomIn(); });
@@ -1238,22 +1353,6 @@ public final class MainActivity extends Activity {
         viewerNotice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(body, viewerNotice, 3);
 
-        Button rotate = viewerAction("Girar el visor", () -> {
-            viewerDialog.dismiss();
-            boolean landscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
-            setRequestedOrientation(landscape ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                    : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        });
-        add(body, rotate, 9);
-        viewerCapture = viewerAction("Guardar captura", () -> {
-            Bitmap frame = desktop.currentFrame();
-            viewerDialog.dismiss();
-            capture.chooseLocation(this, frame);
-        });
-        viewerKeyboard = viewerAction("Escribir en la PC", () -> { viewerDialog.dismiss(); showKeyboard(); });
-        if (viewerMode == DesktopView.Mode.VIEW_ONLY) add(body, viewerCapture, 12);
-        else add(body, tilePair(viewerCapture, viewerKeyboard), 12);
-
         ScrollView scroll = new ScrollView(this);
         scroll.addView(body);
         viewerDialog = dialog()
@@ -1265,21 +1364,10 @@ public final class MainActivity extends Activity {
         viewerDialog.setOnDismissListener(dialog -> {
             viewerDialog = null;
             viewerStats = viewerAudio = viewerNotice = null;
-            viewerLower = viewerRaise = viewerMute = viewerCapture = viewerKeyboard = null;
+            viewerLower = viewerRaise = viewerMute = null;
         });
         refreshViewerTools();
         viewerDialog.show();
-    }
-
-    private void addViewerMode(LinearLayout row, String label, DesktopView.Mode mode) {
-        Button item = button(label, viewerMode == mode);
-        item.setTextSize(12);
-        item.setSelected(viewerMode == mode);
-        item.setOnClickListener(view -> {
-            viewerDialog.dismiss();
-            setViewerMode(mode);
-        });
-        addSegment(row, item);
     }
 
     private void addSegment(LinearLayout row, Button item) {
@@ -1305,10 +1393,18 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshViewerTools() {
-        if (viewerStats == null) return;
         boolean connected = state == ReceiverLink.State.CONNECTED;
         String image = liveVideo.isEmpty() ? (gotFrame ? "Midiendo imagen" : "Sin imagen") : liveVideo;
-        viewerStats.setText(image + (connected && latency >= 0 ? "  ·  " + latency + " ms" : ""));
+        String measurements = image + (connected && latency >= 0 ? "  ·  " + latency + " ms" : "");
+        if (viewerSummary != null && viewerExpanded) {
+            viewerSummary.setText((viewing == Wire.SECOND_DISPLAY ? "Monitor extendido" : "Escritorio remoto") + "  ·  " + measurements);
+            quickCapture.setEnabled(gotFrame && connected && capture.available());
+            quickKeyboard.setEnabled(gotFrame && connected && viewerMode != DesktopView.Mode.VIEW_ONLY);
+            quickDisplay.setText(viewing == Wire.SECOND_DISPLAY ? "Escritorio" : secondary.isEmpty() ? "Preparar" : "Monitor");
+            quickDisplay.setEnabled(connected);
+        }
+        if (viewerStats == null) return;
+        viewerStats.setText(measurements);
         boolean audio = connected && volume >= 0;
         viewerAudio.setText(audio ? "Volumen de Windows  ·  " + volume + " %" : "Volumen de Windows");
         viewerLower.setEnabled(audio);
@@ -1318,8 +1414,6 @@ public final class MainActivity extends Activity {
         viewerNotice.setText(command);
         viewerNotice.setTextColor(commandError ? WARNING : MUTED);
         viewerNotice.setVisibility(command.isEmpty() ? View.GONE : View.VISIBLE);
-        viewerCapture.setEnabled(gotFrame && connected && capture.available());
-        viewerKeyboard.setEnabled(gotFrame && connected && viewerMode != DesktopView.Mode.VIEW_ONLY);
     }
 
     private void dismissViewerDialogs() {
@@ -1370,7 +1464,11 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (viewing != Wire.PAUSED) { closeViewer(); return; }
+        if (viewing != Wire.PAUSED) {
+            if (viewerExpanded) toggleViewerDock(false);
+            else closeViewer();
+            return;
+        }
         if (page != HOME) { showPage(HOME, true); return; }
         super.onBackPressed();
     }
@@ -1433,6 +1531,20 @@ public final class MainActivity extends Activity {
                     .putString("port_" + route.name(), routePorts[route.ordinal()])
                     .putInt("mode", route.ordinal()).apply();
             command = "";
+        }
+
+        @Override public void vpnRoute(String ip, int privatePort) {
+            if (ip.isEmpty() || fingerprint == null) return;
+            int index = ReceiverLink.Mode.VPN.ordinal();
+            routeAddresses[index] = ip;
+            routePorts[index] = Integer.toString(privatePort);
+            if (mode == ReceiverLink.Mode.VPN && state == ReceiverLink.State.CONNECTED) {
+                address.setText(ip);
+                port.setText(routePorts[index]);
+                rememberFields();
+            }
+            preferences.edit().putString("ip_VPN", ip).putString("port_VPN", routePorts[index]).apply();
+            refreshConnection();
         }
 
         @Override public void screens(int count, String target) {

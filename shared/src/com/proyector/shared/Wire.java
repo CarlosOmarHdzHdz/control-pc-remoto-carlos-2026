@@ -24,6 +24,11 @@ public final class Wire {
     public static final int FRAME = 2;
     public static final int PONG = 3;
     public static final int DISPLAYS = 4;
+    public static final int VPN_ROUTE = 5;
+
+    // Older clients treat the opaque 48-digit session token as before.
+    // The prefix opts in to route discovery and leaves 160 random authentication bits.
+    public static final String ROUTE_TOKEN_PREFIX = "0b1a1400";
 
     // Android to Windows. Touch commands include the view revision and the last displayed frame.
     public static final int SLEEP = 1;
@@ -47,6 +52,7 @@ public final class Wire {
     public static final int PING = 19;
     // Curated Windows shortcuts. Values are validated again by the Windows helper.
     public static final int SHORTCUT = 20;
+    public static final int REQUEST_VPN_ROUTE = 21;
 
     public static final int PAUSED = 0;
     public static final int DESKTOP = 1;

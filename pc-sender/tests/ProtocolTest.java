@@ -73,7 +73,7 @@ public final class ProtocolTest {
                     }
                 }
             }
-            System.out.println("Correcto: identidad persistente, TLS, PIN, reconexión, pausa, imágenes en tránsito, Full HD, escalado, estado nativo y lista cerrada de atajos.");
+            System.out.println("Correcto: identidad persistente, TLS, PIN, ruta privada bajo petición, reconexión, pausa, imágenes en tránsito, Full HD, escalado, estado nativo y lista cerrada de atajos.");
         } finally {
             Files.deleteIfExists(key);
             Files.deleteIfExists(directory);
@@ -125,6 +125,9 @@ public final class ProtocolTest {
         try (Peer client = peer(identity, host, host.pin(), "")) {
             check(client.authorization == Wire.OK && client.token.length() == 48, "Autenticación inicial");
             client.ping();
+            client.expectQuiet();
+            check(client.token.startsWith(Wire.ROUTE_TOKEN_PREFIX), "Capacidad de ruta privada");
+            client.requestVpnRoute(host.port());
             client.expectQuiet();
             client.view(1, Wire.DESKTOP);
             int first = client.receiveFrame();
@@ -211,6 +214,21 @@ public final class ProtocolTest {
             while (true) {
                 int packet = input.readInt();
                 if (packet == Wire.PONG) { check(input.readLong() == 123, "Respuesta de conectividad"); return; }
+                discardStatus(packet);
+            }
+        }
+
+        void requestVpnRoute(int expectedPort) throws IOException {
+            output.writeInt(Wire.REQUEST_VPN_ROUTE);
+            output.flush();
+            while (true) {
+                int packet = input.readInt();
+                if (packet == Wire.VPN_ROUTE) {
+                    String privateIp = input.readUTF();
+                    check(privateIp.isEmpty() || Wire.isVpnAddress(Wire.parseAddress(privateIp)), "Solo se anuncia IP privada");
+                    check(input.readInt() == expectedPort, "Puerto real para Tailscale");
+                    return;
+                }
                 discardStatus(packet);
             }
         }

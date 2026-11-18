@@ -141,9 +141,9 @@ final class HostServer implements AutoCloseable {
                 previous = active;
                 active = session = next;
                 if (!equal(previousToken, activeToken) || activeToken.isEmpty()) {
-                    byte[] bytes = new byte[24];
-                    random.nextBytes(bytes);
-                    activeToken = HexFormat.of().formatHex(bytes);
+                    byte[] secret = new byte[20];
+                    random.nextBytes(secret);
+                    activeToken = Wire.ROUTE_TOKEN_PREFIX + HexFormat.of().formatHex(secret);
                 }
                 token = activeToken;
             }

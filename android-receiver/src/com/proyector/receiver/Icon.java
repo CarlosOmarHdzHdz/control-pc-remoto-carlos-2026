@@ -225,6 +225,32 @@ final class Icon extends View {
                 canvas.drawPath(shape, paint);
                 canvas.drawCircle(12, 12, 3, paint);
                 break;
+            case "keyboard":
+                canvas.drawRoundRect(2, 5, 22, 19, 3, 3, paint);
+                for (int x = 6; x <= 18; x += 4) {
+                    canvas.drawPoint(x, 9, paint);
+                    canvas.drawPoint(x, 12, paint);
+                }
+                canvas.drawLine(8, 15.5f, 16, 15.5f, paint);
+                break;
+            case "camera":
+                shape.moveTo(2, 7); shape.lineTo(7, 7); shape.lineTo(9, 4); shape.lineTo(15, 4);
+                shape.lineTo(17, 7); shape.lineTo(22, 7); shape.lineTo(22, 20); shape.lineTo(2, 20); shape.close();
+                canvas.drawPath(shape, paint);
+                canvas.drawCircle(12, 13, 3.5f, paint);
+                break;
+            case "rotate":
+                canvas.drawRoundRect(7, 6, 17, 18, 2, 2, paint);
+                canvas.drawArc(3, 2, 21, 22, -90, 83, false, paint);
+                shape.moveTo(17, 8); shape.lineTo(21, 11); shape.lineTo(23, 7);
+                canvas.drawPath(shape, paint);
+                break;
+            case "exit":
+                canvas.drawRoundRect(4, 4, 15, 20, 2, 2, paint);
+                canvas.drawLine(11, 12, 22, 12, paint);
+                shape.moveTo(18, 8); shape.lineTo(22, 12); shape.lineTo(18, 16);
+                canvas.drawPath(shape, paint);
+                break;
             default: break;
         }
     }

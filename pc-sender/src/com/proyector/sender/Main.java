@@ -120,6 +120,11 @@ public final class Main {
         private final JButton usbSetup = button("Preparar cable ADB", false);
         private final JButton virtualSetup = button("Preparar monitor virtual", true);
         private final JPanel routes = column();
+        private final JLabel lanState = label("Buscando adaptador", 12, MUTED, false);
+        private final JLabel usbState = label("Conecta el cable", 12, MUTED, false);
+        private final JLabel vpnState = label("Abre Tailscale", 12, MUTED, false);
+        private final JPanel usbSection = column();
+        private final JPanel vpnSection = column();
         private final CardLayout layout = new CardLayout();
         private final MotionPane section = new MotionPane(layout);
         private final JButton[] navigation = new JButton[SECTIONS.length];
@@ -301,7 +306,31 @@ public final class Main {
             actions.add(field("Puerto", port), BorderLayout.WEST);
             actions.add(toggle, BorderLayout.CENTER);
             addSpaced(card, actions, 15);
+            JPanel available = new JPanel(new GridLayout(1, 3, 8, 0));
+            available.setOpaque(false);
+            available.add(routeTile("Wi-Fi / LAN", lanState, 2, null));
+            available.add(routeTile("Cable USB", usbState, 1, usbSection));
+            available.add(routeTile("Otra red", vpnState, 0, vpnSection));
+            addSpaced(card, available, 13);
             return card;
+        }
+
+        private JPanel routeTile(String title, JLabel status, int glyph, JComponent destination) {
+            JPanel tile = new Surface(WELL, BORDER, 14);
+            tile.setLayout(new BoxLayout(tile, BoxLayout.Y_AXIS));
+            tile.setBorder(BorderFactory.createEmptyBorder(7, 8, 8, 8));
+            JButton open = button(title, false);
+            open.setIcon(new SectionIcon(glyph));
+            open.setHorizontalAlignment(SwingConstants.LEADING);
+            open.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+            open.addActionListener(event -> {
+                selectSection(2, true);
+                if (destination != null) SwingUtilities.invokeLater(() -> destination.scrollRectToVisible(
+                        new Rectangle(0, 0, destination.getWidth(), destination.getHeight())));
+            });
+            addSpaced(tile, open, 0);
+            addSpaced(tile, status, 5);
+            return tile;
         }
 
         private JPanel displayCard() {
@@ -397,17 +426,19 @@ public final class Main {
             addSpaced(card, editorial("Direcciones de red", 29, TEXT), 0);
             addSpaced(card, label("Usa la dirección correspondiente para una conexión manual.", 12, MUTED, false), 5);
             addSpaced(card, routes, 10);
-            addSpaced(card, label("Cable USB", 16, TEXT, true), 15);
-            addSpaced(card, label("<html>Conecta un cable de datos y activa Compartir Internet por USB en Android. La nueva dirección aparecerá arriba.</html>", 13, MUTED, false), 4);
+            addSpaced(usbSection, label("Cable USB", 16, TEXT, true), 0);
+            addSpaced(usbSection, label("<html>Conecta un cable de datos y activa Compartir Internet por USB en Android. La nueva dirección aparecerá arriba.</html>", 13, MUTED, false), 4);
             usbSetup.setToolTipText("Para teléfonos con depuración USB autorizada y Android Platform Tools en Windows");
             usbSetup.setEnabled(false);
             usbSetup.addActionListener(event -> prepareCable());
-            addSpaced(card, usbSetup, 6);
-            addSpaced(card, label("Otra red", 16, TEXT, true), 13);
-            addSpaced(card, label("<html>Conecta ambos equipos a Tailscale. Copia la dirección Tailscale y pégala en Conexión → Otra red en Android.</html>", 13, MUTED, false), 4);
+            addSpaced(usbSection, usbSetup, 6);
+            addSpaced(card, usbSection, 15);
+            addSpaced(vpnSection, label("Otra red", 16, TEXT, true), 0);
+            addSpaced(vpnSection, label("<html>Conecta ambos equipos a Tailscale. Copia la dirección Tailscale y pégala en Conexión → Otra red en Android.</html>", 13, MUTED, false), 4);
             JButton vpn = button("Obtener Tailscale", false);
             vpn.addActionListener(event -> openPage("https://tailscale.com/download/windows"));
-            addSpaced(card, vpn, 6);
+            addSpaced(vpnSection, vpn, 6);
+            addSpaced(card, vpnSection, 13);
             return card;
         }
 
@@ -525,6 +556,9 @@ public final class Main {
             List<HostNetwork.Route> active = HostNetwork.routes();
             if (!active.equals(currentRoutes) || routes.getComponentCount() == 0) {
                 currentRoutes = active;
+                routeStatus(lanState, "LAN", "Sin red local");
+                routeStatus(usbState, "USB", "Conecta el cable");
+                routeStatus(vpnState, "VPN", "Abre Tailscale");
                 routes.removeAll();
                 if (active.isEmpty()) addSpaced(routes, label("Conecta esta PC por Wi-Fi, Ethernet o USB.", 13, MUTED, false), 0);
                 for (HostNetwork.Route route : active) {
@@ -540,6 +574,13 @@ public final class Main {
                 routes.revalidate();
                 routes.repaint();
             }
+        }
+
+        private void routeStatus(JLabel status, String type, String missing) {
+            String ip = currentRoutes.stream().filter(route -> route.type().equals(type))
+                    .map(route -> route.address().getHostAddress()).findFirst().orElse(null);
+            status.setText(ip == null ? missing : ip);
+            status.setForeground(ip == null ? MUTED : ACCENT);
         }
 
         private String displaysHint(Displays displays) {

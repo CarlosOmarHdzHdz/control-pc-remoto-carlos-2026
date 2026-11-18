@@ -4,10 +4,10 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Con el emisor activo, cerrar la ventana lo minimiza. **Salir** termina la aplicación. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.13.0/downloads/Orbivia-Windows-1.13.0.msi)
-- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.13.0/downloads/Orbivia-Android-1.13.0.apk)
+- **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Con el emisor activo, cerrar la ventana lo minimiza. **Salir** termina la aplicación. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.14.0/downloads/Orbivia-Windows-1.14.0.msi)
+- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.14.0/downloads/Orbivia-Android-1.14.0.apk)
 
-En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector de la barra lateral. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. En el visor puedes girar la imagen desde **Herramientas → Girar el visor**. [Sumas SHA-256](downloads/SHA256SUMS-1.13.0.txt)
+En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector de la barra lateral. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. Dentro del escritorio, abre **Controles del visor** para cambiar entre directo, panel táctil y Solo ver. Desde ahí también puedes girar, abrir el teclado, guardar una captura o cambiar de pantalla. [Sumas SHA-256](downloads/SHA256SUMS-1.14.0.txt)
 
 ## Conectar
 
@@ -23,13 +23,15 @@ En Android, toca el icono de apariencia junto al estado de conexión. En Windows
 
 **Cable de datos con depuración USB.** Si ya usas Android Platform Tools, conecta un único teléfono por USB y autoriza esta PC en Android. En el emisor iniciado abre **Red → Preparar cable ADB**. En Android elige **Cable USB → Usar USB directo (ADB)** e introduce el código. Orbivía prepara el puerto automáticamente aunque el emisor use un puerto distinto de 5050. También puedes usar conexión compartida sin instalar ADB.
 
+Si vinculas Android mientras Tailscale está activo en Windows, Orbivía guarda la dirección privada de esa PC. Al elegir **Otra red**, puedes usarla con el código que muestra el emisor. Configura Tailscale en ambos equipos. [Instalar Tailscale en Android](https://tailscale.com/docs/install/android)
+
 Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo con detección automática, acepta la nueva IP de la misma PC cuando recibe su anuncio y verifica que su identidad siga siendo la misma. Si reinicias el emisor, usa el código nuevo.
 
 ## Escritorio, imagen y controles
 
 - **Control directo.** Toca los elementos del escritorio y arrástralos en la imagen. El **panel táctil** mueve el cursor al deslizar, hace clic al tocar y permite arrastrar con doble toque y pulsación mantenida.
 - **Solo ver.** Pellizca para ampliar hasta 4× y arrastra para recorrer la imagen. Los gestos de este modo actúan sobre la vista de Android.
-- **Herramientas del visor.** Toca el botón superior para cambiar de modo o perfil de imagen, consultar los FPS recibidos y la latencia, regular el volumen o escribir en Windows. **Guardar captura** exporta la imagen mostrada a un PNG en la ubicación que elijas.
+- **Controles del visor.** Abre el panel superior para ver los FPS recibidos y la latencia. Toca **Captura** para guardar un PNG. En **Ajustes** puedes cambiar el perfil de imagen o regular el volumen.
 - **Gestos.** Dos dedos desplazan la página, una pulsación mantenida hace clic derecho y tres dedos abren el teclado. Usa Atrás en Android para salir del escritorio a pantalla completa.
 - **Imagen.** Elige hasta 1080p y un límite de hasta 60 FPS en **Remoto** o cambia de una vez entre **Ahorro**, **Equilibrado**, **Fluido** y **Full HD**. Activa el ajuste automático para que la app reduzca resolución y FPS si el enlace se satura. La resolución y los FPS reales dependen de Windows, Android y la red. La codificación JPEG usa la CPU. La captura se pausa al volver al menú o dejar la app en segundo plano.
 - **Panel táctil.** Ajusta su sensibilidad entre 50 % y 300 % para adaptar el desplazamiento del cursor a tu pantalla.
