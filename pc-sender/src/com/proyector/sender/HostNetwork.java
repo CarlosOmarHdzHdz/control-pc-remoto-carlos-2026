@@ -23,6 +23,18 @@ final class HostNetwork {
                 || (normalized.contains("ndis") && (normalized.contains("remote") || normalized.contains("remoto")));
     }
 
+    static String localLabel(String name, boolean virtual) {
+        if (virtual || name.contains("virtual") || name.contains("vethernet") || name.contains("hyper-v")
+                || name.contains("vmware") || name.contains("wsl") || name.contains("host-only")) return "Red virtual";
+        if (name.contains("wireless") || name.contains("wi-fi") || name.contains("wlan")) return "Wi-Fi";
+        return "Red local";
+    }
+
+    static int routePriority(Route route) {
+        int virtual = route.label().equals("Red virtual") ? 2 : 0;
+        return virtual + (route.address().isLinkLocalAddress() ? 1 : 0);
+    }
+
     static List<Route> routes() {
         List<Route> routes = new ArrayList<>();
         try {
@@ -38,14 +50,14 @@ final class HostNetwork {
                         routes.add(new Route(address, null, "VPN", "Tailscale"));
                     } else if (Wire.isLocalAddress(address) && candidate.getBroadcast() != null) {
                         boolean usb = usbInterface(name);
-                        boolean wireless = name.contains("wireless") || name.contains("wi-fi") || name.contains("wlan");
                         routes.add(new Route(address, candidate.getBroadcast(), usb ? "USB" : "LAN",
-                                usb ? "Cable USB" : wireless ? "Wi-Fi" : "Red local"));
+                                usb ? "Cable USB" : localLabel(name, network.isVirtual())));
                     }
                 }
             }
         } catch (SocketException ignored) { }
-        routes.sort(Comparator.comparing(Route::type).thenComparing(route -> route.address().getHostAddress()));
+        routes.sort(Comparator.comparing(Route::type).thenComparingInt(HostNetwork::routePriority)
+                .thenComparing(route -> route.address().getHostAddress()));
         return routes;
     }
 }

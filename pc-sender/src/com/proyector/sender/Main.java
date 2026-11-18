@@ -577,9 +577,10 @@ public final class Main {
         }
 
         private void routeStatus(JLabel status, String type, String missing) {
-            String ip = currentRoutes.stream().filter(route -> route.type().equals(type))
-                    .map(route -> route.address().getHostAddress()).findFirst().orElse(null);
+            HostNetwork.Route best = currentRoutes.stream().filter(route -> route.type().equals(type)).findFirst().orElse(null);
+            String ip = best == null ? null : best.address().getHostAddress();
             status.setText(ip == null ? missing : ip);
+            status.setToolTipText(best == null ? missing : best.label() + " · " + ip);
             status.setForeground(ip == null ? MUTED : ACCENT);
         }
 

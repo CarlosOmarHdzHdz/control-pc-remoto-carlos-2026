@@ -47,6 +47,12 @@ public final class ProtocolTest {
             check(HostNetwork.usbInterface("Remote NDIS based Internet Sharing Device")
                     && HostNetwork.usbInterface("Dispositivo NDIS remoto")
                     && !HostNetwork.usbInterface("Intel Wi-Fi 6"), "Reconocer los adaptadores de anclaje USB");
+            String wifi = HostNetwork.localLabel("wlan intel wi-fi 6", false);
+            String virtual = HostNetwork.localLabel("vethernet (wsl (hyper-v firewall))", false);
+            check("Wi-Fi".equals(wifi) && "Red virtual".equals(virtual), "Distinguir una red de WSL del Wi-Fi");
+            var wifiRoute = new HostNetwork.Route(Wire.parseAddress("192.168.0.5"), null, "LAN", wifi);
+            var virtualRoute = new HostNetwork.Route(Wire.parseAddress("172.23.160.1"), null, "LAN", virtual);
+            check(HostNetwork.routePriority(wifiRoute) < HostNetwork.routePriority(virtualRoute), "Priorizar la dirección de la red física");
             captureGeometry();
             automaticQuality();
             WindowsControl audio = new WindowsControl();
