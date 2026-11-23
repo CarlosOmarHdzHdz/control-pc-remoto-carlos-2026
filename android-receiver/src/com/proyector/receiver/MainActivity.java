@@ -155,6 +155,7 @@ public final class MainActivity extends Activity {
     private TextView savedRouteHint;
     private LatencyHistory history;
     private Button homeOpen, viewerHandle;
+    private LinearLayout padButtons;
     private LinearLayout viewerDock, viewerPanel;
     private TextView viewerSummary;
     private final Button[] quickModes = new Button[DesktopView.Mode.values().length];
@@ -195,6 +196,7 @@ public final class MainActivity extends Activity {
         desktop = new DesktopView(this, new DesktopView.Input() {
             @Override public void send(int command, int... values) { if (gotFrame) link.pointer(command, visibleSequence, values); }
             @Override public void keyboard() { showKeyboard(); }
+            @Override public void leftClick(boolean twice) { sendPadClick(twice); }
         });
         desktop.pointerSensitivity(pointerSpeed);
         history = new LatencyHistory(this);
@@ -379,6 +381,20 @@ public final class MainActivity extends Activity {
                 -2, Gravity.TOP | Gravity.END);
         handlePosition.setMargins(dp(10), dp(10), dp(10), 0);
         viewerHost.addView(viewerDock, handlePosition);
+        padButtons = horizontal();
+        padButtons.setGravity(Gravity.CENTER);
+        padButtons.setPadding(dp(5), dp(5), dp(5), dp(5));
+        padButtons.setBackground(surface(0xF22B2136, 18, 0xFF73566A));
+        addSegment(padButtons, viewerAction("Clic", () -> sendPadClick(false)));
+        addSegment(padButtons, viewerAction("Doble clic", () -> sendPadClick(true)));
+        addSegment(padButtons, viewerAction("Derecho", () -> {
+            if (padReady()) link.pointer(Wire.RIGHT_CLICK, visibleSequence);
+        }));
+        FrameLayout.LayoutParams clicks = new FrameLayout.LayoutParams(
+                Math.min(dp(340), getResources().getDisplayMetrics().widthPixels - dp(24)), -2,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        clicks.bottomMargin = dp(16);
+        viewerHost.addView(padButtons, clicks);
         root.addView(viewerHost, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         showPage(page, false);
@@ -1202,6 +1218,15 @@ public final class MainActivity extends Activity {
         if (latestFrame.get() != null && drawScheduled.compareAndSet(false, true)) main.post(this::drawLatest);
     }
 
+    private boolean padReady() {
+        return foreground && viewing != Wire.PAUSED && viewerMode == DesktopView.Mode.TOUCHPAD
+                && state == ReceiverLink.State.CONNECTED && gotFrame;
+    }
+
+    private void sendPadClick(boolean twice) {
+        if (padReady()) link.leftClick(visibleSequence, twice);
+    }
+
     private void setViewerMode(DesktopView.Mode mode) {
         viewerMode = mode;
         desktop.mode(mode);
@@ -1394,6 +1419,12 @@ public final class MainActivity extends Activity {
 
     private void refreshViewerTools() {
         boolean connected = state == ReceiverLink.State.CONNECTED;
+        if (padButtons != null) {
+            padButtons.setVisibility(viewing != Wire.PAUSED && viewerMode == DesktopView.Mode.TOUCHPAD && !viewerExpanded
+                    ? View.VISIBLE : View.GONE);
+            boolean enabled = padReady();
+            for (int i = 0; i < padButtons.getChildCount(); i++) padButtons.getChildAt(i).setEnabled(enabled);
+        }
         String image = liveVideo.isEmpty() ? (gotFrame ? "Midiendo imagen" : "Sin imagen") : liveVideo;
         String measurements = image + (connected && latency >= 0 ? "  ·  " + latency + " ms" : "");
         if (viewerSummary != null && viewerExpanded) {

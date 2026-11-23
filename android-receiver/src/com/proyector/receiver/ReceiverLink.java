@@ -162,11 +162,29 @@ final class ReceiverLink implements AutoCloseable {
         if (link == null) return;
         int revision = view.revision;
         link.enqueue(output -> {
-            output.writeInt(command);
-            output.writeInt(revision);
-            output.writeInt(sequence);
-            for (int value : args) output.writeInt(value);
+            writePointer(output, command, revision, sequence, args);
         }, command == Wire.MOVE || command == Wire.RELATIVE || command == Wire.SCROLL);
+    }
+
+    void leftClick(int sequence, boolean twice) {
+        Connection link = connection;
+        if (link == null) return;
+        int revision = view.revision;
+        link.enqueue(output -> {
+            int count = twice ? 2 : 1;
+            for (int i = 0; i < count; i++) {
+                writePointer(output, Wire.DOWN, revision, sequence, -1, -1);
+                writePointer(output, Wire.UP, revision, sequence, -1, -1);
+            }
+        }, false);
+    }
+
+    private static void writePointer(DataOutputStream output, int command, int revision,
+                                     int sequence, int... values) throws IOException {
+        output.writeInt(command);
+        output.writeInt(revision);
+        output.writeInt(sequence);
+        for (int value : values) output.writeInt(value);
     }
 
     boolean text(String text, int sequence) {

@@ -5,9 +5,9 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 ## Descargar e instalar
 
 - **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Con el emisor activo, cerrar la ventana lo minimiza. **Salir** termina la aplicación. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.14.1/downloads/Orbivia-Windows-1.14.1.msi)
-- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.14.1/downloads/Orbivia-Android-1.14.0.apk)
+- **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.14.2/downloads/Orbivia-Android-1.14.2.apk)
 
-En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector de la barra lateral. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. Dentro del escritorio, abre **Controles del visor** para cambiar entre directo, panel táctil y Solo ver. Desde ahí también puedes girar, abrir el teclado, guardar una captura o cambiar de pantalla. [Sumas SHA-256](downloads/SHA256SUMS-1.14.1.txt)
+En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector de la barra lateral. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. Dentro del escritorio, abre **Controles del visor** para cambiar entre directo, panel táctil y Solo ver. Desde ahí también puedes girar, abrir el teclado, guardar una captura o cambiar de pantalla. [Sumas SHA-256](downloads/SHA256SUMS-1.14.2.txt)
 
 ## Conectar
 
@@ -29,7 +29,7 @@ Cuando un enlace activo se interrumpe, la app intenta recuperarlo. En el modo co
 
 ## Escritorio, imagen y controles
 
-- **Control directo.** Toca los elementos del escritorio y arrástralos en la imagen. El **panel táctil** mueve el cursor al deslizar, hace clic al tocar y permite arrastrar con doble toque y pulsación mantenida.
+- **Control directo.** Toca los elementos del escritorio y arrástralos en la imagen. En **Panel táctil**, desliza el dedo hasta dejar el cursor sobre el elemento. Toca una vez o pulsa **Clic** para seleccionarlo. Pulsa **Doble clic** para abrir una carpeta o **Derecho** para abrir su menú. Para arrastrar, toca dos veces y mueve el dedo durante el segundo toque.
 - **Solo ver.** Pellizca para ampliar hasta 4× y arrastra para recorrer la imagen. Los gestos de este modo actúan sobre la vista de Android.
 - **Controles del visor.** Abre el panel superior para ver los FPS recibidos y la latencia. Toca **Captura** para guardar un PNG. En **Ajustes** puedes cambiar el perfil de imagen o regular el volumen.
 - **Gestos.** Dos dedos desplazan la página, una pulsación mantenida hace clic derecho y tres dedos abren el teclado. Usa Atrás en Android para salir del escritorio a pantalla completa.

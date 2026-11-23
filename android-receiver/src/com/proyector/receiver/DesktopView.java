@@ -21,12 +21,13 @@ final class DesktopView extends View {
     interface Input {
         void send(int command, int... values);
         void keyboard();
+        void leftClick(boolean twice);
     }
 
     private final Input input;
     private final RectF destination = new RectF();
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
-    private final int slop;
+    private final int slop, padSlop, doubleTapSlop;
     private final ScaleGestureDetector pinch;
     private final GestureDetector pan;
     private Bitmap bitmap;
@@ -36,12 +37,16 @@ final class DesktopView extends View {
     private boolean moved, longPressed, pressed, twoFingers, secondTap, skipGesture;
     private float startX, startY, lastX, lastY, scrollY, relativeX, relativeY;
     private long lastMotion, lastTap;
+    private float tapX, tapY;
     private final Runnable longPress = () -> { if (!moved && !twoFingers) longPressed = true; };
 
     DesktopView(Context context, Input input) {
         super(context);
         this.input = input;
-        slop = ViewConfiguration.get(context).getScaledTouchSlop();
+        ViewConfiguration config = ViewConfiguration.get(context);
+        slop = config.getScaledTouchSlop();
+        padSlop = Math.max(slop, Math.round(12 * getResources().getDisplayMetrics().density));
+        doubleTapSlop = config.getScaledDoubleTapSlop();
         setBackgroundColor(Color.BLACK);
         setContentDescription("Escritorio de Windows a pantalla completa");
         pinch = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -71,6 +76,7 @@ final class DesktopView extends View {
 
     void mode(Mode value) {
         endGesture();
+        lastTap = 0;
         mode = value;
         resetZoom();
         setContentDescription(mode == Mode.VIEW_ONLY ? "Escritorio en modo Solo ver" : "Escritorio de Windows a pantalla completa");
@@ -147,7 +153,9 @@ final class DesktopView extends View {
             removeCallbacks(longPress);
             moved = longPressed = pressed = twoFingers = skipGesture = false;
             relativeX = relativeY = 0;
-            secondTap = panelMode && SystemClock.uptimeMillis() - lastTap < ViewConfiguration.getDoubleTapTimeout();
+            secondTap = panelMode && lastTap > 0 && event.getEventTime() - lastTap < ViewConfiguration.getDoubleTapTimeout()
+                    && Math.hypot(startX - tapX, startY - tapY) <= doubleTapSlop;
+            lastTap = 0;
             postDelayed(longPress, ViewConfiguration.getLongPressTimeout());
         } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
             removeCallbacks(longPress);
@@ -193,7 +201,7 @@ final class DesktopView extends View {
         float x = event.getX();
         float y = event.getY();
         boolean panelMode = mode == Mode.TOUCHPAD;
-        if (Math.hypot(x - startX, y - startY) > slop) { moved = true; removeCallbacks(longPress); }
+        if (Math.hypot(x - startX, y - startY) > (panelMode ? padSlop : slop)) { moved = true; removeCallbacks(longPress); }
         if (moved && panelMode) {
             if (!pressed && (secondTap || longPressed)) { input.send(Wire.DOWN, -1, -1); pressed = true; }
             relativeX += (x - lastX) * pointerSensitivity;
@@ -224,8 +232,9 @@ final class DesktopView extends View {
         if (longPressed) {
             if (mode == Mode.TOUCHPAD || absolute(Wire.MOVE, x, y, false)) input.send(Wire.RIGHT_CLICK);
         } else if (mode == Mode.TOUCHPAD) {
-            input.send(Wire.DOWN, -1, -1);
-            input.send(Wire.UP, -1, -1);
+            input.leftClick(false);
+            tapX = x;
+            tapY = y;
             lastTap = SystemClock.uptimeMillis();
         } else if (absolute(Wire.DOWN, x, y, false)) {
             absolute(Wire.UP, x, y, false);
