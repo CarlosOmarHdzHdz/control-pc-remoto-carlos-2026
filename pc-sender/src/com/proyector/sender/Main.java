@@ -147,7 +147,7 @@ public final class Main {
 
         SenderWindow() {
             super("Orbivía · Emisor");
-            setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+            setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             setMinimumSize(new Dimension(640, 490));
             setSize(960, 685);
             setLocationByPlatform(true);
@@ -192,14 +192,12 @@ public final class Main {
             refresh.start();
             addWindowListener(new WindowAdapter() {
                 @Override public void windowActivated(WindowEvent event) { if (appearance.getSelectedIndex() == 0) updateAppearance(); }
-                @Override public void windowClosing(WindowEvent event) {
-                    if (server == null) dispose();
-                    else {
-                        setExtendedState(getExtendedState() | Frame.ICONIFIED);
-                        showMessage("El emisor sigue en la barra de tareas. Usa Salir para cerrarlo.", false);
-                    }
+                @Override public void windowClosed(WindowEvent event) {
+                    refresh.stop();
+                    section.motion.stop();
+                    tabs.motion.stop();
+                    stopServer();
                 }
-                @Override public void windowClosed(WindowEvent event) { refresh.stop(); section.motion.stop(); tabs.motion.stop(); stopServer(); }
             });
             loadIdentity();
         }
@@ -559,7 +557,8 @@ public final class Main {
             server = null;
             if (running != null) {
                 toggle.setEnabled(false);
-                WindowsControl.daemon(() -> {
+                // Keep the process alive until the session releases remote input and closes its sockets.
+                new Thread(() -> {
                     try { running.close(); }
                     finally { SwingUtilities.invokeLater(() -> toggle.setEnabled(identity != null)); }
                 }, "pc-stop").start();

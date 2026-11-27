@@ -4,10 +4,10 @@ Mira el escritorio completo de Windows desde Android y manéjalo con la pantalla
 
 ## Descargar e instalar
 
-- **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Con el emisor activo, cerrar la ventana lo minimiza. **Salir** termina la aplicación. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.15.0/downloads/Orbivia-Windows-1.15.0.msi)
+- **Windows 10/11 de 64 bits.** El instalador guarda Orbivía en tu perfil y añade accesos al escritorio y a Inicio. Abre la aplicación y haz clic derecho en su icono para elegir **Anclar a la barra de tareas**. Usa **Minimizar** para mantener el emisor en la barra de tareas. La **X** y **Salir** cierran Orbivía y desconectan el emisor. [Descargar el instalador para Windows](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.15.1/downloads/Orbivia-Windows-1.15.1.msi)
 - **Android 6 o posterior.** Instala la APK sobre la versión anterior para conservar tu PC vinculada. [Descargar Orbivía para Android](https://raw.githubusercontent.com/CarlosOmarHdzHdz/control-pc-remoto-carlos-2026/v1.15.0/downloads/Orbivia-Android-1.15.0.apk)
 
-En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector en la parte superior. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. Dentro del escritorio, abre **Controles del visor** para cambiar entre directo, panel táctil y Solo ver. Desde ahí también puedes girar, abrir el teclado, guardar una captura o cambiar de pantalla. [Sumas SHA-256](downloads/SHA256SUMS-1.15.0.txt)
+En Android, toca el icono de apariencia junto al estado de conexión. En Windows, usa el selector en la parte superior. Ambos recuerdan tu elección entre **Sistema**, **Blanco** y **Oscuro**. En Inicio, toca la batería para consultar ambos equipos, el volumen para abrir los controles o la latencia para ir al gráfico. Dentro del escritorio, abre **Controles del visor** para cambiar entre directo, panel táctil y Solo ver. Desde ahí también puedes girar, abrir el teclado, guardar una captura o cambiar de pantalla. [Sumas SHA-256](downloads/SHA256SUMS-1.15.1.txt)
 
 ## Conectar
 
