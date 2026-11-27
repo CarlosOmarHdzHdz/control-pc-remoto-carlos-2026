@@ -1,11 +1,31 @@
 <resources>
     <style name="ControlPcTheme" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:colorAccent">#823D5F</item>
-        <item name="android:colorBackground">#F6F0E9</item>
-        <item name="android:windowBackground">#F6F0E9</item>
+        <item name="android:colorAccent">#1155C2</item>
+        <item name="android:colorBackground">@color/window_surface</item>
+        <item name="android:windowBackground">@color/window_surface</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="OrbiviaDialogLight" parent="@android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#1155C2</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:textColorPrimary">#12253A</item>
+        <item name="android:textColorSecondary">#4E6277</item>
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:windowAnimationStyle">@style/OrbiviaDialogMotion</item>
+    </style>
+    <style name="OrbiviaDialogDark" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#9DF5D1</item>
+        <item name="android:colorBackground">#172639</item>
+        <item name="android:textColorPrimary">#F0F6FF</item>
+        <item name="android:textColorSecondary">#B4C4D6</item>
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:windowAnimationStyle">@style/OrbiviaDialogMotion</item>
+    </style>
+    <style name="OrbiviaDialogMotion" parent="@android:style/Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@android:anim/fade_out</item>
     </style>
 </resources>

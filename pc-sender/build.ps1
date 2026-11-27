@@ -33,6 +33,6 @@ if (-not (Test-Path -LiteralPath $compiler)) { throw 'Falta el compilador de .NE
 $helper = Join-Path $native 'WindowsControls.exe'
 & $compiler /nologo /codepage:65001 /target:winexe /optimize+ "/out:$helper" (Join-Path $project 'windows\WindowsControls.cs')
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo compilar el componente de audio y energía de Windows.' }
-& (Join-Path $jdk 'jar.exe') cfe $jar com.proyector.sender.Main -C $classes .
+& (Join-Path $jdk 'jar.exe') cfe $jar com.proyector.sender.Main -C $classes . -C (Join-Path $project '..\shared\art') studio_devices.png
 if ($LASTEXITCODE -ne 0) { throw 'jar no pudo crear el ejecutable de Java' }
 Write-Output "Creado: $jar"

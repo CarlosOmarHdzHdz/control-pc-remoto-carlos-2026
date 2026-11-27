@@ -94,6 +94,26 @@ final class Icon extends View {
     private static void drawGlyph(Canvas canvas, Paint paint, Path shape, String name, float level, boolean charging) {
         shape.reset();
         switch (name) {
+            case "open":
+                shape.moveTo(5, 19); shape.lineTo(19, 5);
+                shape.moveTo(6, 5); shape.lineTo(19, 5); shape.lineTo(19, 18);
+                canvas.drawPath(shape, paint);
+                break;
+            case "next-row":
+                shape.moveTo(9, 5); shape.lineTo(16, 12); shape.lineTo(9, 19);
+                canvas.drawPath(shape, paint);
+                break;
+            case "image":
+                canvas.drawRoundRect(2, 4, 22, 20, 3, 3, paint);
+                shape.moveTo(4, 16); shape.lineTo(10, 10); shape.lineTo(15, 15); shape.lineTo(18, 12); shape.lineTo(21, 15);
+                canvas.drawPath(shape, paint);
+                canvas.drawCircle(17, 8, 1, paint);
+                break;
+            case "transfer":
+                shape.moveTo(3, 8); shape.lineTo(20, 8); shape.lineTo(16, 4);
+                shape.moveTo(21, 16); shape.lineTo(4, 16); shape.lineTo(8, 20);
+                canvas.drawPath(shape, paint);
+                break;
             case "home":
                 shape.moveTo(3, 11); shape.lineTo(12, 3); shape.lineTo(21, 11);
                 shape.moveTo(5, 10); shape.lineTo(5, 21); shape.lineTo(19, 21); shape.lineTo(19, 10);

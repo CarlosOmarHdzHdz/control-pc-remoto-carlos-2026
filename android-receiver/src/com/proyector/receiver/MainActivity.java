@@ -14,6 +14,9 @@ import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -51,6 +54,8 @@ import android.widget.Toast;
 
 import com.proyector.shared.Wire;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,9 +70,9 @@ public final class MainActivity extends Activity {
     private boolean dark;
     private int appearance;
     private static final String[] THEMES = {"Sistema", "Blanco", "Oscuro"};
-    private static final int INK = 0xFF291D3C;
-    private static final int PEACH = 0xFFFFB295;
-    private static final int ON_INK = 0xFFFFF6EC;
+    private static final int INK = 0xFF101E38;
+    private static final int MINT = 0xFF9DF5D1;
+    private static final int ON_INK = 0xFFF3FAFF;
     private static final int HOME = 0, REMOTE = 1, MONITOR = 2, CONTROLS = 3, CONNECTION = 4;
     private static final String[] TAB_NAMES = {"Inicio", "Remoto", "Monitor", "Controles", "Conexión"};
     private static final String[] TAB_ICONS = {"home", "screen", "dual", "sliders", "link"};
@@ -122,7 +127,7 @@ public final class MainActivity extends Activity {
     private boolean manual;
     private boolean error;
     private boolean commandError;
-    private boolean wide;
+    private boolean wide, compactHeader;
     private boolean foreground;
     private boolean muted;
     private boolean charging;
@@ -141,18 +146,21 @@ public final class MainActivity extends Activity {
     private long meterStart;
     private int frameCount;
     private FrameLayout root, pageHost, viewerHost;
-    private LinearLayout shell, nav, manualFields;
+    private LinearLayout shell, manualFields;
+    private NavigationBar nav;
     private View[] pages;
     private Button[] modeButtons;
     private Switch adaptiveSwitch;
     private NavItem[] navigation;
     private DesktopView desktop;
-    private OrbitArtwork orbit;
+    private Bitmap devices;
+    private ImageView homeArt;
+    private DisplayMap displayMap;
     private Icon pcBatteryIcon, deviceBatteryIcon, speakerIcon;
     private boolean phoneCharging;
     private boolean waitingForMonitor;
     private Button tailscale, pasteRoute;
-    private TextView savedRouteHint;
+    private TextView savedRouteHint, pairingHeading;
     private LatencyHistory history;
     private Button homeOpen, viewerHandle;
     private LinearLayout padButtons;
@@ -167,7 +175,7 @@ public final class MainActivity extends Activity {
     private TextView result, resolutionHint, measurement, profileHint, pointerSpeedLabel, monitorHint, videoHint, volumeLabel, discovery, connectionStatus, routeHint;
     private Button connect, manualToggle, usbSettings, adb, forget, startSecond, mute, qualityButton, rateButton;
     private EditText pin, address, port;
-    private SeekBar slider;
+    private VolumeFader slider;
     private AlertDialog verifyDialog, viewerDialog, textDialog;
     private WifiManager.MulticastLock broadcasts;
     private final BroadcastReceiver batteryChanges = new BroadcastReceiver() {
@@ -201,6 +209,11 @@ public final class MainActivity extends Activity {
         desktop.pointerSensitivity(pointerSpeed);
         history = new LatencyHistory(this);
         link = new ReceiverLink(main, new LinkEvents());
+        try (InputStream image = getAssets().open("studio_devices.png")) {
+            devices = BitmapFactory.decodeStream(image);
+        } catch (IOException unavailable) {
+            android.util.Log.w("Orbivia", "Ilustración de inicio no disponible", unavailable);
+        }
         buildUi();
     }
 
@@ -266,20 +279,21 @@ public final class MainActivity extends Activity {
     private void buildUi() {
         Configuration current = getResources().getConfiguration();
         dark = appearance == 2 || (appearance == 0 && (current.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
-        BG = dark ? 0xFF19151F : 0xFFFDFBFC;
-        HEADER = dark ? 0xFF201B26 : Color.WHITE;
-        PANEL = dark ? 0xFF29232F : Color.WHITE;
-        WELL = dark ? 0xFF342D3C : 0xFFF5F0F4;
-        BORDER = dark ? 0xFF524559 : 0xFFE4D8DE;
-        TEXT = dark ? 0xFFF8F1F5 : INK;
-        MUTED = dark ? 0xFFCCBBC9 : 0xFF665968;
-        ACCENT = dark ? 0xFFF2AFC5 : 0xFF833A5C;
-        ACCENT_SURFACE = dark ? 0xFF4D3043 : 0xFFF8DFE8;
+        BG = dark ? 0xFF0C1524 : 0xFFF1F5F9;
+        HEADER = dark ? 0xFF111E30 : Color.WHITE;
+        PANEL = dark ? 0xFF172639 : Color.WHITE;
+        WELL = dark ? 0xFF20334A : 0xFFEBF1F7;
+        BORDER = dark ? 0xFF364A60 : 0xFFCEDBE6;
+        TEXT = dark ? 0xFFF0F6FF : 0xFF12253A;
+        MUTED = dark ? 0xFFB4C4D6 : 0xFF4E6277;
+        ACCENT = dark ? MINT : 0xFF1155C2;
+        ACCENT_SURFACE = dark ? 0xFF183D42 : 0xFFE2EDFF;
         ON_ACCENT = dark ? INK : Color.WHITE;
-        WARNING = dark ? 0xFFFFBF9F : 0xFF933F26;
-        DANGER = dark ? 0xFF593539 : 0xFFF9DFDD;
+        WARNING = dark ? 0xFFFFBA96 : 0xFF963B1E;
+        DANGER = dark ? 0xFF463038 : 0xFFFFE9E6;
         history.colors(BORDER, ACCENT);
-        wide = current.screenWidthDp >= 700;
+        wide = current.screenWidthDp >= 700 && current.screenHeightDp >= 410;
+        compactHeader = !wide && current.screenWidthDp < 300 * current.fontScale;
         root = new FrameLayout(this);
         root.setBackgroundColor(BG);
         shell = vertical();
@@ -314,12 +328,13 @@ public final class MainActivity extends Activity {
         LinearLayout head = horizontal();
         head.setBackgroundColor(HEADER);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(16), dp(8), dp(15), dp(8));
+        head.setPadding(dp(wide ? 22 : 16), dp(5), dp(12), dp(5));
         ImageView mark = new ImageView(this);
         mark.setImageResource(R.drawable.proyector_icon);
-        head.addView(mark, lp(dp(38), dp(38)));
-        TextView brand = editorial("Orbivía", 25, TEXT);
+        head.addView(mark, lp(dp(36), dp(36)));
+        TextView brand = editorial("Orbivía", 23, TEXT);
         brand.setSingleLine();
+        brand.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams brandParams = weighted(1f);
         brandParams.setMarginStart(dp(10));
         head.addView(brand, brandParams);
@@ -343,9 +358,9 @@ public final class MainActivity extends Activity {
 
         LinearLayout body = wide ? horizontal() : vertical();
         shell.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
-        nav = wide ? vertical() : horizontal();
-        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
-        nav.setBackground(surface(HEADER, wide ? 0 : 22, BORDER));
+        nav = new NavigationBar();
+        nav.setPadding(dp(wide ? 4 : 2), dp(wide ? 12 : 2), dp(wide ? 4 : 2), dp(wide ? 0 : 2));
+        nav.setBackgroundColor(HEADER);
         navigation = new NavItem[TAB_NAMES.length];
         for (int i = 0; i < navigation.length; i++) {
             final int destination = i;
@@ -354,13 +369,13 @@ public final class MainActivity extends Activity {
             if (wide) add(nav, navigation[i], 3);
             else nav.addView(navigation[i], weighted(1f));
         }
-        if (wide) body.addView(nav, lp(dp(130), -1));
+        if (wide) body.addView(nav, lp(dp(92), -1));
         pageHost = new FrameLayout(this);
         if (wide) body.addView(pageHost, new LinearLayout.LayoutParams(0, -1, 1));
         else {
             body.addView(pageHost, new LinearLayout.LayoutParams(-1, 0, 1));
             LinearLayout.LayoutParams dock = lp(-1, -2);
-            dock.setMargins(dp(10), dp(4), dp(10), dp(6));
+            dock.topMargin = dp(1);
             body.addView(nav, dock);
         }
 
@@ -384,10 +399,10 @@ public final class MainActivity extends Activity {
         padButtons = horizontal();
         padButtons.setGravity(Gravity.CENTER);
         padButtons.setPadding(dp(5), dp(5), dp(5), dp(5));
-        padButtons.setBackground(surface(0xF22B2136, 18, 0xFF73566A));
-        addSegment(padButtons, viewerAction("Clic", () -> sendPadClick(false)));
-        addSegment(padButtons, viewerAction("Doble clic", () -> sendPadClick(true)));
-        addSegment(padButtons, viewerAction("Derecho", () -> {
+        padButtons.setBackground(surface(0xF2112238, 14, 0xFF4D6989));
+        addSegment(padButtons, padButton("Clic", true, () -> sendPadClick(false)));
+        addSegment(padButtons, padButton("Doble clic", false, () -> sendPadClick(true)));
+        addSegment(padButtons, padButton("Derecho", false, () -> {
             if (padReady()) link.pointer(Wire.RIGHT_CLICK, visibleSequence);
         }));
         FrameLayout.LayoutParams clicks = new FrameLayout.LayoutParams(
@@ -400,11 +415,11 @@ public final class MainActivity extends Activity {
         showPage(page, false);
         setViewerVisibility();
         refresh();
-        if (page == HOME) orbit.post(orbit::enter);
+        if (page == HOME) homeArt.post(() -> reveal(homeArt, 8, 330));
     }
 
     private AlertDialog.Builder dialog() {
-        return new AlertDialog.Builder(this, dark ? android.R.style.Theme_Material_Dialog_Alert : android.R.style.Theme_Material_Light_Dialog_Alert);
+        return new AlertDialog.Builder(this, dark ? R.style.OrbiviaDialogDark : R.style.OrbiviaDialogLight);
     }
 
     private void chooseTheme() {
@@ -420,88 +435,116 @@ public final class MainActivity extends Activity {
     private View homePage() {
         LinearLayout content = page(null);
         LinearLayout overview = vertical();
-        FrameLayout hero = new FrameLayout(this);
-        hero.setBackground(gradientSurface(new int[]{INK, 0xFF432A54}, 24, 0));
-        orbit = new OrbitArtwork(this);
-        hero.addView(orbit, new FrameLayout.LayoutParams(dp(wide ? 212 : 175), dp(155), Gravity.TOP | Gravity.END));
+        LinearLayout hero = vertical();
+        hero.setPadding(dp(18), dp(14), dp(15), dp(16));
+        hero.setBackground(gradientSurface(new int[]{INK, 0xFF153C75, 0xFF235CA6}, 20, 0));
+
+        LinearLayout session = horizontal();
+        session.setBaselineAligned(false);
+        session.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout device = vertical();
-        device.setPadding(dp(19), dp(16), dp(19), dp(18));
-        if (wide) {
-            Icon station = new Icon(this, "screen", PEACH);
-            device.addView(station, lp(dp(32), dp(32)));
-        } else {
-            phoneLabel = text("", 12, ON_INK, true);
-            phoneLabel.setPadding(dp(5), 0, 0, 0);
-            View power = devicePower();
-            deviceBatteryIcon.tint(PEACH);
-            device.addView(power);
-        }
-        homeComputer = editorial("Tu computadora", 30, ON_INK);
+        LinearLayout platform = horizontal();
+        platform.setGravity(Gravity.CENTER_VERTICAL);
+        platform.addView(new Icon(this, "screen", MINT), lp(dp(19), dp(19)));
+        TextView windows = text("Windows", 12, MINT, true);
+        windows.setPadding(dp(6), 0, 0, 0);
+        platform.addView(windows);
+        device.addView(platform);
+        homeComputer = editorial("", wide ? 32 : 28, ON_INK);
         homeComputer.setMaxLines(2);
         homeComputer.setEllipsize(TextUtils.TruncateAt.END);
-        add(device, homeComputer, 12);
-        homeStatus = text("", 13, 0xFFE5CDD8, false);
-        add(device, homeStatus, 5);
+        add(device, homeComputer, 6);
+        homeStatus = text("", 13, 0xFFD4E6FB, false);
+        add(device, homeStatus, 4);
+        session.addView(device, weighted(1.1f));
+        homeArt = new ImageView(this);
+        if (devices != null) homeArt.setImageBitmap(devices);
+        else homeArt.setImageResource(R.drawable.proyector_icon);
+        homeArt.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        homeArt.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        session.addView(homeArt, new LinearLayout.LayoutParams(0, dp(wide ? 136 : 114), 1f));
+        hero.addView(session, lp(-1, -2));
+
+        LinearLayout actionsBar = horizontal();
+        actionsBar.setGravity(Gravity.CENTER_VERTICAL);
         homeOpen = button("Vincular PC", true);
         homeOpen.setTextColor(INK);
-        homeOpen.setBackground(tappable(PEACH, 12, 0));
+        homeOpen.setBackground(tappable(MINT, 9, 0));
+        homeOpen.setPadding(dp(14), dp(6), dp(14), dp(6));
         homeOpen.setOnClickListener(view -> {
             if (state == ReceiverLink.State.CONNECTED) openViewer(Wire.DESKTOP, DesktopView.Mode.DIRECT);
             else showPage(CONNECTION, true);
         });
-        add(device, homeOpen, 16);
-        hero.addView(device, new FrameLayout.LayoutParams(-1, -2));
+        actionsBar.addView(homeOpen, lp(-2, -2));
+        if (!wide) {
+            phoneLabel = text("", 12, ON_INK, true);
+            phoneLabel.setPadding(dp(4), 0, 0, 0);
+            View power = devicePower();
+            deviceBatteryIcon.tint(MINT);
+            actionsBar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+            actionsBar.addView(power);
+        }
+        add(hero, actionsBar, 10);
         overview.addView(hero, lp(-1, -2));
 
+        LinearLayout health = vertical();
+        health.addView(sectionLabel("Estado del equipo"));
         LinearLayout metrics = horizontal();
         metrics.setBaselineAligned(false);
-        metrics.setBackground(surface(PANEL, 16, BORDER));
-        homeBattery = title("—", 18);
-        homeVolume = title("—", 18);
-        homeLatency = title("—", 18);
+        homeBattery = title("—", 20);
+        homeVolume = title("—", 20);
+        homeLatency = title("—", 20);
         metrics.addView(metricCard("battery", "Batería PC", homeBattery), weighted(1f));
-        metrics.addView(metricCard("volume", "Volumen", homeVolume), weighted(1f));
-        metrics.addView(metricCard("latency", "Respuesta", homeLatency), weighted(1f));
-        add(overview, metrics, 10);
+        for (View metric : new View[]{metricCard("volume", "Volumen", homeVolume), metricCard("latency", "Respuesta", homeLatency)}) {
+            LinearLayout.LayoutParams sized = weighted(1);
+            sized.setMarginStart(dp(6));
+            metrics.addView(metric, sized);
+        }
+        add(health, metrics, 8);
 
         LinearLayout linkHealth = card(false);
         linkHealth.addView(title("Respuesta de la conexión", 15));
         historyStatus = text("", 12, MUTED, false);
-        add(linkHealth, historyStatus, 3);
+        add(linkHealth, historyStatus, 2);
         if (history.getParent() instanceof LinearLayout) ((LinearLayout) history.getParent()).removeView(history);
-        LinearLayout.LayoutParams graph = lp(-1, dp(40));
-        graph.topMargin = dp(5);
-        linkHealth.addView(history, graph);
+        linkHealth.addView(history, lp(-1, dp(42)));
+        add(health, linkHealth, 8);
 
         LinearLayout actions = vertical();
-        actions.addView(editorial("Accesos rápidos", 24, TEXT));
+        actions.addView(sectionLabel("Modos de uso"));
         add(actions, tilePair(featureTile("touch", "Panel táctil", "Mover el cursor", false,
                         () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD)),
-                featureTile("dual", "Segundo monitor", "Extender Windows", true, () -> showPage(MONITOR, true))), 9);
-        add(actions, actionRow("eye", "Solo ver", "Amplía la imagen con dos dedos", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 8);
-        add(actions, actionRow("sliders", "Controles", "Volumen, multimedia y energía", () -> showPage(CONTROLS, true)), 6);
-        LinearLayout imageProfile = card(true);
-        imageProfile.addView(title("Calidad de imagen  ›", 15));
+                featureTile("dual", "Segundo monitor", "Extender Windows", true, () -> showPage(MONITOR, true))), 8);
+        LinearLayout tools = card(false);
+        tools.setPadding(dp(8), dp(2), dp(8), dp(2));
+        tools.addView(actionRow("eye", "Solo ver", "Ampliar el escritorio", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)));
+        separator(tools);
+        tools.addView(actionRow("sliders", "Controles", "Sonido, atajos y energía", () -> showPage(CONTROLS, true)));
+        separator(tools);
         homeImageProfile = text("", 12, MUTED, false);
-        add(imageProfile, homeImageProfile, 3);
-        imageProfile.setFocusable(true);
-        imageProfile.setOnClickListener(view -> showPage(REMOTE, true));
-        pressMotion(imageProfile);
-        add(actions, imageProfile, 8);
-        if (wide) add(overview, linkHealth, 10);
+        tools.addView(actionRow("image", "Imagen", homeImageProfile, () -> showPage(REMOTE, true)));
+        add(actions, tools, 10);
+        if (wide) add(overview, health, 17);
         add(content, columns(overview, actions), 0);
-        if (!wide) add(content, linkHealth, 13);
+        if (!wide) add(content, health, 18);
         return scroll(content);
     }
 
     private View remotePage() {
         LinearLayout content = page("Escritorio remoto");
         profileTiles.clear();
-        add(content, tilePair(actionRow("screen", "Control directo", "Toca para usar Windows", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.DIRECT)),
-                actionRow("touch", "Panel táctil", "Desliza para mover el cursor", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD))), 13);
-        add(content, actionRow("eye", "Solo ver", "Observa y amplía la pantalla sin enviar toques", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)), 7);
+        LinearLayout modes = vertical();
+        modes.addView(sectionLabel("Modo de control"));
+        LinearLayout inputs = card(false);
+        inputs.setPadding(dp(8), dp(2), dp(8), dp(2));
+        inputs.addView(actionRow("screen", "Control directo", "Toca los elementos de Windows", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.DIRECT)));
+        separator(inputs);
+        inputs.addView(actionRow("touch", "Panel táctil", "Mueve el cursor y haz clic", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.TOUCHPAD)));
+        separator(inputs);
+        inputs.addView(actionRow("eye", "Solo ver", "Pellizca para ampliar", () -> openViewer(Wire.DESKTOP, DesktopView.Mode.VIEW_ONLY)));
+        add(modes, inputs, 8);
         LinearLayout video = card(false);
-        video.addView(title("Calidad de imagen", 17));
+        video.addView(sectionTitle("image", "Límites de transmisión"));
         adaptiveSwitch = new Switch(this);
         adaptiveSwitch.setText("Ajuste automático");
         adaptiveSwitch.setTextColor(TEXT);
@@ -535,15 +578,14 @@ public final class MainActivity extends Activity {
         add(video, measurement, 6);
 
         LinearLayout profiles = card(false);
-        profiles.addView(title("Perfiles de imagen", 17));
-        add(profiles, text("Cambia resolución y fluidez juntos. El ajuste automático se adapta a la red.", 13, MUTED, false), 5);
+        profiles.addView(sectionTitle("sliders", "Perfil de imagen"));
         profileHint = text("", 12, ACCENT, true);
         add(profiles, profileHint, 8);
         add(profiles, tilePair(profileButton(Profile.SAVER), profileButton(Profile.BALANCED)), 8);
         add(profiles, tilePair(profileButton(Profile.SMOOTH), profileButton(Profile.FULL_HD)), 8);
 
         LinearLayout pointer = card(false);
-        pointer.addView(title("Sensibilidad del panel táctil", 17));
+        pointer.addView(sectionTitle("touch", "Sensibilidad del cursor"));
         pointerSpeedLabel = text(pointerSpeed + " %", 14, ACCENT, true);
         add(pointer, pointerSpeedLabel, 7);
         SeekBar speed = new SeekBar(this);
@@ -568,31 +610,46 @@ public final class MainActivity extends Activity {
         add(pointer, text("Ajusta cuánto se mueve el cursor con cada deslizamiento.", 12, MUTED, false), 2);
 
         LinearLayout gestures = card(false);
-        gestures.addView(title("Gestos en pantalla completa", 17));
-        add(gestures, text("Dos dedos  ·  Desplazar", 14, MUTED, false), 8);
-        add(gestures, text("Mantener pulsado  ·  Clic derecho", 14, MUTED, false), 7);
-        add(gestures, text("Tres dedos  ·  Abrir teclado", 14, MUTED, false), 7);
-        add(gestures, text("Panel táctil: toca dos veces y mantén para arrastrar.", 13, MUTED, false), 9);
-        add(content, columns(video, profiles), 13);
-        add(content, columns(pointer, gestures), 10);
+        gestures.addView(sectionTitle("touch", "Gestos"));
+        add(gestures, text("Dos dedos para desplazar. Mantén pulsado para abrir el menú contextual. Toca con tres dedos para escribir.", 13, MUTED, false), 6);
+        add(gestures, text("Para arrastrar en el panel táctil, toca dos veces y mueve el dedo durante el segundo toque.", 13, MUTED, false), 5);
+        LinearLayout image = vertical();
+        image.addView(profiles);
+        add(image, video, 10);
+        if (wide) {
+            add(modes, pointer, 10);
+            add(modes, gestures, 10);
+        }
+        add(content, columns(modes, image), 14);
+        if (!wide) {
+            add(content, pointer, 10);
+            add(content, gestures, 10);
+        }
         return scroll(content);
     }
 
     private View monitorPage() {
         LinearLayout content = page("Segundo monitor");
-        LinearLayout card = card(false);
-        card.addView(iconBadge("dual"), lp(dp(47), dp(47)));
-        add(card, title("Pantalla adicional de Windows", 19), 10);
-        monitorHint = text("", 14, MUTED, false);
-        add(card, monitorHint, 6);
-        startSecond = button("Abrir a pantalla completa", true);
+        LinearLayout display = card(false);
+        display.setBackground(gradientSurface(new int[]{INK, 0xFF163B67}, 16, 0));
+        displayMap = new DisplayMap(this);
+        display.addView(displayMap, lp(-1, dp(wide ? 148 : 116)));
+        add(display, text("Escritorio extendido", 20, ON_INK, true), 10);
+        monitorHint = text("", 14, 0xFFD0E1F5, false);
+        add(display, monitorHint, 5);
+        startSecond = button("", true);
+        startSecond.setTextColor(INK);
+        startSecond.setBackground(tappable(MINT, 9, 0));
         startSecond.setOnClickListener(view -> monitorAction());
-        add(card, startSecond, 12);
+        add(display, startSecond, 14);
         LinearLayout help = card(false);
-        help.addView(title("Preparar el escritorio extendido", 17));
-        add(help, text("En Orbivía para Windows, abre Pantallas. Si tienes una sola pantalla, pulsa Preparar monitor virtual y elige Install en Virtual Driver Control.", 14, MUTED, false), 8);
-        add(help, text("Pulsa Extender escritorio en la PC. Cuando aparezca la pantalla adicional, podrás mover ventanas hacia ella con Win + Mayús + Flecha.", 14, MUTED, false), 8);
-        add(content, columns(card, help), 13);
+        help.addView(sectionLabel("Preparar en Windows"));
+        add(help, instruction("dual", "Activa otra pantalla", "En Pantallas, pulsa Preparar monitor virtual y elige Install si solo tienes una pantalla."), 13);
+        separator(help);
+        help.addView(instruction("screen", "Extiende el escritorio", "Pulsa Extender escritorio. Si hay varias pantallas adicionales, elige la que verá Android."));
+        separator(help);
+        help.addView(instruction("transfer", "Mueve una ventana", "Usa Win + Mayús + Flecha para pasar la ventana activa a la pantalla contigua."));
+        add(content, columns(display, help), 14);
         return scroll(content);
     }
 
@@ -618,10 +675,17 @@ public final class MainActivity extends Activity {
         result.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(content, result, 8);
         LinearLayout audio = card(false);
-        audio.addView(editorial("Sonido", 24, TEXT));
-        volumeLabel = editorial("—", 34, TEXT);
-        add(audio, volumeLabel, 5);
-        slider = new SeekBar(this);
+        audio.setBackground(gradientSurface(new int[]{INK, 0xFF1B3554}, 16, 0));
+        LinearLayout sound = horizontal();
+        sound.setGravity(Gravity.CENTER_VERTICAL);
+        sound.addView(new Icon(this, "volume", MINT), lp(dp(23), dp(23)));
+        TextView soundTitle = text("Volumen de Windows", 14, ON_INK, true);
+        soundTitle.setPadding(dp(8), 0, 0, 0);
+        sound.addView(soundTitle, weighted(1f));
+        audio.addView(sound);
+        volumeLabel = editorial("—", 34, ON_INK);
+        add(audio, volumeLabel, 8);
+        slider = new VolumeFader(this);
         slider.setMax(100);
         slider.setProgressTintList(ColorStateList.valueOf(ACCENT));
         slider.setThumbTintList(ColorStateList.valueOf(ACCENT));
@@ -629,6 +693,7 @@ public final class MainActivity extends Activity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar control, int value, boolean user) {
                 if (!user) return;
+                slider.followFinger(value);
                 volumeLabel.setText(value + " %");
                 if (!volumeDragging) {
                     main.removeCallbacks(accessibleVolume);
@@ -646,36 +711,50 @@ public final class MainActivity extends Activity {
         down.setContentDescription("Bajar volumen cinco por ciento");
         Button up = control("+5 %", Wire.VOLUME_UP, null, audioButtons);
         up.setContentDescription("Subir volumen cinco por ciento");
-        add(audio, tilePair(down, up), 5);
         mute = control("Silenciar", Wire.MUTE, null, audioButtons);
-        add(audio, mute, 8);
-        add(audio, title("Reproducción", 15), 15);
+        LinearLayout audioActions = horizontal();
+        styleAudioKey(down, "volume-low");
+        styleAudioKey(mute, "mute");
+        styleAudioKey(up, "volume");
+        addSegment(audioActions, down);
+        addSegment(audioActions, mute);
+        addSegment(audioActions, up);
+        add(audio, audioActions, 6);
+        LinearLayout media = card(false);
+        media.addView(sectionTitle("play", "Reproducción"));
         LinearLayout playback = horizontal();
         addSegment(playback, shortcut("Anterior", 5));
         addSegment(playback, shortcut("Pausa / Play", 4));
         addSegment(playback, shortcut("Siguiente", 6));
-        add(audio, playback, 6);
+        add(media, playback, 10);
 
         LinearLayout power = card(false);
-        power.addView(editorial("Energía y sesión", 22, TEXT));
+        power.addView(sectionTitle("power", "Energía y sesión"));
         add(power, tilePair(control("Bloquear", Wire.LOCK, null, powerButtons),
                 control("Suspender", Wire.SLEEP, "Windows quedará en reposo y la conexión se interrumpirá.", powerButtons)), 10);
         add(power, tilePair(control("Reiniciar", Wire.RESTART, "Guarda el trabajo abierto antes de reiniciar.", powerButtons),
                 control("Apagar PC", Wire.SHUTDOWN, "Guarda el trabajo abierto antes de apagar.", powerButtons)), 8);
         LinearLayout shortcuts = card(false);
-        shortcuts.addView(editorial("Atajos de Windows", 22, TEXT));
+        shortcuts.addView(sectionTitle("keyboard", "Atajos de Windows"));
         add(shortcuts, tilePair(shortcut("Escritorio", 1), shortcut("Cambiar ventana", 2)), 8);
         add(shortcuts, shortcut("Administrador de tareas", 3), 7);
         LinearLayout system = vertical();
         system.addView(shortcuts, lp(-1, -2));
         add(system, power, 10);
-        add(content, columns(audio, system), 10);
+        LinearLayout soundControls = vertical();
+        soundControls.addView(audio);
+        add(soundControls, media, 10);
+        add(content, columns(soundControls, system), 10);
         return scroll(content);
     }
 
     private View connectionPage() {
         LinearLayout content = page("Conexión");
+        LinearLayout routes = card(false);
+        routes.addView(sectionTitle("link", "Método de conexión"));
         LinearLayout card = card(false);
+        pairingHeading = sectionLabel("Código de Windows");
+        card.addView(sectionTitle("lock", pairingHeading));
         LinearLayout modes = horizontal();
         modeButtons = new Button[3];
         String[] names = {"Wi-Fi / LAN", "Cable USB", "Otra red"};
@@ -683,23 +762,24 @@ public final class MainActivity extends Activity {
             ReceiverLink.Mode selection = ReceiverLink.Mode.values()[i];
             modeButtons[i] = button(names[i], false);
             modeButtons[i].setTextSize(13);
+            if (compactHeader) modeButtons[i].setMinLines(2);
             decorate(modeButtons[i], new String[]{"wifi", "usb", "globe"}[i], true);
             modeButtons[i].setOnClickListener(view -> selectMode(selection));
             LinearLayout.LayoutParams p = weighted(1f);
             if (i > 0) p.setMarginStart(dp(5));
             modes.addView(modeButtons[i], p);
         }
-        card.addView(modes, lp(-1, -2));
+        add(routes, modes, 12);
         routeHint = text("", 14, MUTED, false);
-        add(card, routeHint, 12);
+        add(routes, routeHint, 12);
         usbSettings = button("Abrir ajustes de USB", false);
         usbSettings.setOnClickListener(view -> openUsbSettings());
-        add(card, usbSettings, 8);
+        add(routes, usbSettings, 8);
         tailscale = button("Abrir Tailscale", false);
         tailscale.setOnClickListener(view -> openTailscale());
-        add(card, tailscale, 6);
+        add(routes, tailscale, 6);
         savedRouteHint = text("", 13, ACCENT, true);
-        add(card, savedRouteHint, 8);
+        add(routes, savedRouteHint, 8);
         pasteRoute = button("Pegar dirección de la PC", false);
         pasteRoute.setOnClickListener(view -> pasteRoute());
         add(card, pasteRoute, 6);
@@ -708,7 +788,9 @@ public final class MainActivity extends Activity {
         pin = field("Código de 6 dígitos", InputType.TYPE_CLASS_NUMBER);
         pin.setFilters(new InputFilter[]{new InputFilter.LengthFilter(6)});
         pin.setText(savedPin);
-        pin.setTextSize(19);
+        pin.setTextSize(18);
+        pin.setGravity(Gravity.CENTER);
+        pin.setTypeface(Typeface.MONOSPACE);
         pin.setImeOptions(EditorInfo.IME_ACTION_GO | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         pin.setOnEditorActionListener((view, action, event) -> {
             if (action == EditorInfo.IME_ACTION_GO) { connectOrDisconnect(); return true; }
@@ -747,18 +829,27 @@ public final class MainActivity extends Activity {
                     .setMessage("En Orbivía para Windows abre Red y pulsa Preparar cable ADB. Autoriza la PC en Android si se solicita. Después escribe el código aquí y pulsa Conectar.")
                     .setPositiveButton("Entendido", null).show();
         });
-        add(card, adb, 7);
+        add(routes, adb, 7);
         connectionStatus = text("", 14, MUTED, false);
         connectionStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         add(card, connectionStatus, 11);
 
         LinearLayout security = card(false);
-        security.addView(title("Vinculación cifrada", 17));
+        security.addView(sectionTitle("lock", "Identidad de la PC"));
         add(security, text("La primera vez, compara la identidad de Windows con la que aparece en Android. El teléfono recordará la identidad de esa PC.", 14, MUTED, false), 8);
         forget = button("Olvidar PC vinculada", false);
         forget.setOnClickListener(view -> forgetPc());
         add(security, forget, 11);
-        add(content, columns(card, security), 13);
+        if (wide) {
+            LinearLayout entry = vertical();
+            entry.addView(card);
+            add(entry, security, 10);
+            add(content, columns(routes, entry), 14);
+        } else {
+            add(content, routes, 12);
+            add(content, card, 10);
+            add(content, security, 10);
+        }
         return scroll(content);
     }
 
@@ -772,6 +863,7 @@ public final class MainActivity extends Activity {
         address.setText(savedIp);
         port.setText(savedPort);
         refreshConnection();
+        reveal(routeHint, 5, 165);
     }
 
     private void connectOrDisconnect() {
@@ -919,34 +1011,38 @@ public final class MainActivity extends Activity {
             modeButtons[i].setBackground(tappable(selected ? ACCENT_SURFACE : WELL, 10, selected ? ACCENT : BORDER));
             modeButtons[i].setSelected(selected);
         }
-        routeHint.setText(mode == ReceiverLink.Mode.LAN ? "Conecta Android y Windows a la misma red."
+        boolean active = state == ReceiverLink.State.CONNECTED;
+        pairingHeading.setText(active ? "Sesión activa" : "Código de Windows");
+        routeHint.setText(active ? "Esta sesión usa " + (mode == ReceiverLink.Mode.USB ? "el cable USB." : mode == ReceiverLink.Mode.VPN ? "Tailscale." : "la red local.")
+                : mode == ReceiverLink.Mode.LAN ? "Conecta Android y Windows a la misma red."
                 : mode == ReceiverLink.Mode.USB ? "Conecta un cable de datos, abre los ajustes de USB y activa Compartir Internet por USB. La PC aparecerá debajo."
                 : "Abre Tailscale en los dos equipos con la misma cuenta. Copia la dirección Tailscale desde Red en el emisor e introdúcela aquí.");
         List<ReceiverLink.Endpoint> candidates = discoveredDevices();
-        discovery.setVisibility(mode == ReceiverLink.Mode.VPN ? View.GONE : View.VISIBLE);
-        discovery.setText(candidates.isEmpty() ? "Buscando la PC…" : candidates.size() == 1
+        discovery.setVisibility(mode == ReceiverLink.Mode.VPN && !active ? View.GONE : View.VISIBLE);
+        discovery.setText(active ? computer : candidates.isEmpty() ? "Buscando la PC…" : candidates.size() == 1
                 ? candidates.get(0).computer + "  ·  " + candidates.get(0).address()
                 : candidates.size() + " PC disponibles");
         boolean busy = state != ReceiverLink.State.IDLE;
         boolean usb = mode == ReceiverLink.Mode.USB;
-        tailscale.setVisibility(mode == ReceiverLink.Mode.VPN ? View.VISIBLE : View.GONE);
+        tailscale.setVisibility(!active && mode == ReceiverLink.Mode.VPN ? View.VISIBLE : View.GONE);
         boolean knownPrivateRoute = mode == ReceiverLink.Mode.VPN && validAddress(savedIp, mode) != null;
-        savedRouteHint.setVisibility(knownPrivateRoute ? View.VISIBLE : View.GONE);
+        savedRouteHint.setVisibility(!active && knownPrivateRoute ? View.VISIBLE : View.GONE);
         if (knownPrivateRoute) savedRouteHint.setText("Dirección de tu PC guardada");
-        pasteRoute.setVisibility(mode == ReceiverLink.Mode.VPN || manual ? View.VISIBLE : View.GONE);
+        pasteRoute.setVisibility(!active && (mode == ReceiverLink.Mode.VPN || manual) ? View.VISIBLE : View.GONE);
         pasteRoute.setEnabled(!busy);
         for (Button route : modeButtons) route.setEnabled(!busy);
         adb.setEnabled(!busy);
         manualToggle.setEnabled(!busy);
-        usbSettings.setVisibility(usb ? View.VISIBLE : View.GONE);
-        adb.setVisibility(usb ? View.VISIBLE : View.GONE);
-        boolean showIp = manual || mode == ReceiverLink.Mode.VPN;
+        usbSettings.setVisibility(!active && usb ? View.VISIBLE : View.GONE);
+        adb.setVisibility(!active && usb ? View.VISIBLE : View.GONE);
+        boolean showIp = !active && (manual || mode == ReceiverLink.Mode.VPN);
         manualFields.setVisibility(showIp ? View.VISIBLE : View.GONE);
-        manualToggle.setVisibility(mode == ReceiverLink.Mode.VPN ? View.GONE : View.VISIBLE);
+        manualToggle.setVisibility(active || mode == ReceiverLink.Mode.VPN ? View.GONE : View.VISIBLE);
         manualToggle.setText(showIp ? "Usar detección automática" : "Introducir IP manual");
         connect.setText(state == ReceiverLink.State.CONNECTED ? "Desconectar" : busy ? "Cancelar conexión" : "Conectar");
         forget.setEnabled(fingerprint != null);
         pin.setEnabled(!busy);
+        pin.setVisibility(state == ReceiverLink.State.CONNECTED ? View.GONE : View.VISIBLE);
         address.setEnabled(!busy);
         port.setEnabled(!busy);
         connectionStatus.setText(status);
@@ -975,15 +1071,30 @@ public final class MainActivity extends Activity {
     private void refresh() {
         if (homeStatus == null) return;
         boolean connected = state == ReceiverLink.State.CONNECTED;
-        orbit.connectionChanged(connected);
+        displayMap.status(connected, connected && !secondary.isEmpty());
         paintPowerIcons();
         homeOpen.setText(connected ? "Abrir escritorio  →" : "Vincular PC  →");
         String route = linkedMode == ReceiverLink.Mode.USB ? "USB" : linkedMode == ReceiverLink.Mode.VPN ? "Tailscale" : "red local";
-        badge.setText(connected ? "Conectado" : state == ReceiverLink.State.IDLE ? "Sin conexión" : "Conectando");
-        badge.setTextColor(connected ? ACCENT : MUTED);
-        badge.setBackground(tappable(connected ? ACCENT_SURFACE : WELL, 16, BORDER));
+        String connectionLabel = connected ? "Conectado" : state == ReceiverLink.State.IDLE ? "Sin conexión" : "Conectando";
+        badge.setText(compactHeader ? "" : connectionLabel);
+        badge.setContentDescription(connectionLabel);
+        if (!Boolean.valueOf(connected).equals(badge.getTag())) {
+            badge.setTag(connected);
+            badge.setTextColor(connected ? ACCENT : MUTED);
+            badge.setBackground(tappable(connected ? ACCENT_SURFACE : WELL, 9, 0));
+            int tint = connected ? ACCENT : MUTED;
+            android.graphics.drawable.Drawable glyph = Icon.drawable(connected ? "link" : "screen", tint, dp(compactHeader ? 22 : 15));
+            if (compactHeader) {
+                badge.setMinWidth(dp(48));
+                badge.setCompoundDrawables(null, glyph, null, null);
+                badge.setCompoundDrawablePadding(0);
+            } else {
+                badge.setCompoundDrawablesRelative(glyph, null, null, null);
+                badge.setCompoundDrawablePadding(dp(5));
+            }
+        }
         phoneLabel.setText(phoneBattery < 0 ? "" : "Android " + phoneBattery + " %");
-        homeComputer.setText(computer.isEmpty() ? "Tu computadora" : computer);
+        homeComputer.setText(computer.isEmpty() ? "Tu escritorio" : computer);
         homeStatus.setText(connected ? "Cifrado activo · " + route + " · " + networkQuality() : status);
         homeBattery.setText(!connected ? "—" : battery < 0 ? "N/D" : battery + " %" + (charging ? "  ↗" : ""));
         homeBattery.setTextColor(battery >= 0 && battery <= 15 ? WARNING : TEXT);
@@ -998,10 +1109,12 @@ public final class MainActivity extends Activity {
         for (View control : shortcutButtons) control.setEnabled(connected);
         slider.setEnabled(connected && volume >= 0);
         if (!volumeDragging) {
-            slider.setProgress(Math.max(0, volume));
+            slider.reading(Math.max(0, volume));
             volumeLabel.setText(volume < 0 || !connected ? "—" : volume + " %" + (muted ? "  ·  Silenciado" : ""));
         }
-        mute.setText(muted ? "Reactivar sonido" : "Silenciar");
+        mute.setText(muted ? "Reactivar" : "Silenciar");
+        mute.setSelected(muted);
+        mute.setContentDescription(muted ? "Reactivar sonido de Windows" : "Silenciar Windows");
         result.setText(command.isEmpty() ? connected ? "" : "Conecta tu PC para usar los controles." : command);
         result.setTextColor(commandError ? WARNING : MUTED);
         result.setVisibility(result.length() == 0 ? View.GONE : View.VISIBLE);
@@ -1017,9 +1130,9 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshQuality() {
-        qualityButton.setText(Wire.RESOLUTIONS[quality]);
+        qualityButton.setText("Resolución\n" + Wire.RESOLUTIONS[quality]);
         qualityButton.setContentDescription("Resolución máxima " + Wire.RESOLUTIONS[quality]);
-        rateButton.setText(Wire.FRAME_RATES[frameRate] + " FPS");
+        rateButton.setText("Fluidez\n" + Wire.FRAME_RATES[frameRate] + " FPS");
         rateButton.setContentDescription("Fluidez máxima " + Wire.FRAME_RATES[frameRate] + " fotogramas por segundo");
         resolutionHint.setText(adaptive ? "La calidad baja si la red o la PC se saturan." : "La resolución y los FPS elegidos son límites máximos.");
         measurement.setVisibility(lastVideo.isEmpty() ? View.GONE : View.VISIBLE);
@@ -1032,7 +1145,7 @@ public final class MainActivity extends Activity {
             boolean selected = currentProfile.equals(tile.getTag());
             if (tile.isSelected() != selected) {
                 tile.setSelected(selected);
-                tile.setBackground(tappable(selected ? ACCENT_SURFACE : PANEL, 17, selected ? ACCENT : BORDER));
+                tile.setBackground(tappable(selected ? ACCENT_SURFACE : WELL, 9, selected ? ACCENT : 0));
             }
         }
     }
@@ -1072,7 +1185,6 @@ public final class MainActivity extends Activity {
 
     private void showPage(int index, boolean animate) {
         boolean entering = animate && index != page && animationsEnabled();
-        int direction = index >= page ? 1 : -1;
         if (page == CONNECTION && index != CONNECTION) { rememberFields(); closeKeyboard(); }
         for (int i = 0; i < pages.length; i++) {
             pages[i].animate().cancel();
@@ -1083,24 +1195,16 @@ public final class MainActivity extends Activity {
             waitingForMonitor = false;
             refresh();
         }
+        nav.select(index, entering);
         page = index;
         View current = pages[page];
-        current.setAlpha(entering ? .15f : 1f);
-        current.setTranslationX(entering ? direction * dp(18) : 0f);
         if (entering) {
-            if (current instanceof ScrollView) {
-                LinearLayout content = (LinearLayout) ((ScrollView) current).getChildAt(0);
-                for (int i = 0; i < Math.min(4, content.getChildCount()); i++) {
-                    View item = content.getChildAt(i);
-                    item.animate().cancel();
-                    item.setTranslationY(dp(8));
-                    item.animate().translationY(0).setStartDelay(i * 22L).setDuration(190)
-                            .setInterpolator(new DecelerateInterpolator()).start();
-                }
-            }
-            current.animate().alpha(1f).translationX(0f).setDuration(255)
-                    .setInterpolator(new DecelerateInterpolator()).start();
-            if (index == HOME) orbit.enter();
+            reveal(current, 9, 205);
+            if (index == HOME) reveal(homeArt, 8, 300);
+            if (index == MONITOR) displayMap.enter();
+        } else {
+            current.setAlpha(1f);
+            current.setTranslationY(0);
         }
     }
 
@@ -1239,21 +1343,21 @@ public final class MainActivity extends Activity {
         viewerHandle.setTextSize(13);
         viewerHandle.setPadding(dp(12), 0, dp(12), 0);
         viewerHandle.setTextColor(ON_INK);
-        viewerHandle.setBackground(tappable(0xE5291D3C, 16, 0x8AFFB295));
+        viewerHandle.setBackground(tappable(0xEF102039, 12, 0x88689ABC));
         viewerHandle.setOnClickListener(view -> toggleViewerDock(!viewerExpanded));
         dock.addView(viewerHandle, new LinearLayout.LayoutParams(-2, -2, 0f));
         ((LinearLayout.LayoutParams) viewerHandle.getLayoutParams()).gravity = Gravity.END;
 
         viewerPanel = vertical();
         viewerPanel.setPadding(dp(12), dp(10), dp(12), dp(11));
-        viewerPanel.setBackground(gradientSurface(new int[]{0xFF30243A, 0xFF241C30}, 18, 0xFF72536F));
+        viewerPanel.setBackground(gradientSurface(new int[]{0xFF162C4B, 0xFF101E32}, 15, 0xFF466381));
         viewerPanel.setElevation(dp(8));
         viewerPanel.setClickable(true);
-        viewerSummary = text("", 12, 0xFFF4D5E0, true);
+        viewerSummary = text("", 12, 0xFFD1E4F4, true);
         viewerPanel.addView(viewerSummary);
         LinearLayout modes = horizontal();
-        addQuickMode(modes, "Directo", "touch", DesktopView.Mode.DIRECT);
-        addQuickMode(modes, "Panel táctil", "screen", DesktopView.Mode.TOUCHPAD);
+        addQuickMode(modes, "Directo", "screen", DesktopView.Mode.DIRECT);
+        addQuickMode(modes, "Panel táctil", "touch", DesktopView.Mode.TOUCHPAD);
         addQuickMode(modes, "Solo ver", "eye", DesktopView.Mode.VIEW_ONLY);
         add(viewerPanel, modes, 8);
 
@@ -1293,9 +1397,9 @@ public final class MainActivity extends Activity {
         Button item = viewerAction(label, action);
         item.setTextSize(12);
         item.setTextColor(new ColorStateList(new int[][]{{-android.R.attr.state_enabled}, {}},
-                new int[]{0xFFC8B5C8, ON_INK}));
-        item.setBackground(tappable(0xFF43354E, 11, 0));
-        item.setCompoundDrawables(null, Icon.drawable(icon, PEACH, dp(19)), null, null);
+                new int[]{0xFF9BAFC0, ON_INK}));
+        item.setBackground(tappable(0xFF263C57, 11, 0));
+        item.setCompoundDrawables(null, Icon.drawable(icon, MINT, dp(19)), null, null);
         item.setCompoundDrawablePadding(dp(3));
         return item;
     }
@@ -1323,7 +1427,7 @@ public final class MainActivity extends Activity {
         for (Button item : quickModes) {
             boolean selected = item == quickModes[viewerMode.ordinal()];
             item.setSelected(selected);
-            item.setBackground(tappable(selected ? 0xFF644154 : 0xFF43354E, 11, selected ? PEACH : 0));
+            item.setBackground(tappable(selected ? 0xFF24564D : 0xFF263C57, 11, selected ? MINT : 0));
         }
         refreshViewerTools();
     }
@@ -1399,6 +1503,13 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams space = weighted(1);
         if (row.getChildCount() > 0) space.setMarginStart(dp(6));
         row.addView(item, space);
+    }
+
+    private Button padButton(String label, boolean primary, Runnable action) {
+        Button button = viewerAction(label, action);
+        button.setTextColor(primary ? INK : ON_INK);
+        button.setBackground(tappable(primary ? MINT : 0xFF263C57, 9, 0));
+        return button;
     }
 
     private Button viewerAction(String label, Runnable action) {
@@ -1640,6 +1751,17 @@ public final class MainActivity extends Activity {
         return button;
     }
 
+    private void styleAudioKey(Button key, String symbol) {
+        decorate(key, symbol, true);
+        int[][] states = {{-android.R.attr.state_enabled}, {}};
+        key.setTextColor(new ColorStateList(states, new int[]{0xFFADBFD1, ON_INK}));
+        key.setCompoundDrawableTintList(new ColorStateList(states, new int[]{0xFF8BA0B5, MINT}));
+        StateListDrawable background = new StateListDrawable();
+        background.addState(new int[]{android.R.attr.state_selected, android.R.attr.state_enabled}, tappable(0xFF205349, 9, MINT));
+        background.addState(new int[0], tappable(0xFF243B56, 9, 0));
+        key.setBackground(background);
+    }
+
     private Button shortcut(String label, int shortcut) {
         Button action = button(label, false);
         String[] icons = {"", "screen", "dual", "sliders", "play", "prev", "next"};
@@ -1653,11 +1775,27 @@ public final class MainActivity extends Activity {
     private View profileButton(Profile profile) {
         LinearLayout option = card(true);
         option.setMinimumHeight(dp(76));
-        option.addView(title(profile.label, 15));
+        LinearLayout header = horizontal();
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(title(profile.label, 15), weighted(1));
+        GradientDrawable dot = surface(ACCENT, 6, 0);
+        GradientDrawable ring = surface(Color.TRANSPARENT, 6, BORDER);
+        StateListDrawable selection = new StateListDrawable();
+        selection.addState(new int[]{android.R.attr.state_selected}, dot);
+        selection.addState(new int[0], ring);
+        View indicatorDot = new View(this);
+        indicatorDot.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        indicatorDot.setDuplicateParentStateEnabled(true);
+        indicatorDot.setBackground(selection);
+        header.setDuplicateParentStateEnabled(true);
+        header.addView(indicatorDot, lp(dp(11), dp(11)));
+        option.addView(header);
         add(option, text(profile.limits(), 12, MUTED, false), 3);
         option.setContentDescription(profile.label + ", " + profile.limits());
         option.setTag(profile.label);
+        option.setFocusable(true);
         pressMotion(option);
+        option.setBackground(tappable(WELL, 9, 0));
         profileTiles.add(option);
         option.setOnClickListener(view -> {
             applyProfile(profile);
@@ -1683,15 +1821,15 @@ public final class MainActivity extends Activity {
 
     private View featureTile(String symbol, String heading, String detail, boolean warm, Runnable action) {
         LinearLayout tile = vertical();
-        int fill = warm ? (dark ? 0xFF422F32 : 0xFFFFE8D9) : ACCENT_SURFACE;
-        int ink = warm ? (dark ? 0xFFFFC5AA : 0xFF75391F) : ACCENT;
-        tile.setBackground(tappable(fill, 20, 0));
+        int fill = warm ? (dark ? 0xFF17413F : 0xFFCAF2E3) : (dark ? 0xFF203E72 : 0xFFDCE9FF);
+        int ink = warm ? (dark ? MINT : 0xFF155849) : (dark ? 0xFFBDD8FF : 0xFF164999);
+        tile.setBackground(tappable(fill, 14, 0));
         tile.setPadding(dp(13), dp(12), dp(13), dp(13));
         LinearLayout top = horizontal();
         top.addView(new Icon(this, symbol, ink), lp(dp(29), dp(29)));
-        TextView arrow = text("↗", 17, ink, true);
-        arrow.setGravity(Gravity.END);
-        top.addView(arrow, weighted(1));
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        top.addView(new Icon(this, "open", ink), lp(dp(16), dp(16)));
         tile.addView(top);
         TextView name = text(heading, 15, TEXT, true);
         add(tile, name, 8);
@@ -1706,20 +1844,17 @@ public final class MainActivity extends Activity {
     private View metricCard(String icon, String label, TextView value) {
         LinearLayout metric = vertical();
         metric.setPadding(dp(8), dp(10), dp(8), dp(10));
-        metric.setGravity(Gravity.CENTER_HORIZONTAL);
+        metric.setGravity(Gravity.START);
         Icon glyph = new Icon(this, icon, ACCENT);
         if (icon.equals("battery")) pcBatteryIcon = glyph;
         if (icon.equals("volume")) speakerIcon = glyph;
-        glyph.setBackground(surface(ACCENT_SURFACE, 14, 0));
-        glyph.setPadding(dp(6), dp(6), dp(6), dp(6));
-        metric.addView(glyph, lp(dp(36), dp(36)));
+        metric.addView(glyph, lp(dp(23), dp(23)));
         TextView caption = text(label, 11, MUTED, true);
-        caption.setGravity(Gravity.CENTER);
-        value.setGravity(Gravity.CENTER);
+        value.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         add(metric, value, 4);
         add(metric, caption, 1);
         metric.setFocusable(true);
-        metric.setBackground(tappable(PANEL, 16, 0));
+        metric.setBackground(tappable(PANEL, 12, BORDER));
         metric.setOnClickListener(view -> {
             if (icon.equals("volume")) showPage(CONTROLS, true);
             else if (icon.equals("latency")) {
@@ -1741,21 +1876,25 @@ public final class MainActivity extends Activity {
     }
 
     private View actionRow(String symbol, String heading, String detail, Runnable action) {
+        return actionRow(symbol, heading, text(detail, 12, MUTED, false), action);
+    }
+
+    private View actionRow(String symbol, String heading, TextView detail, Runnable action) {
         LinearLayout row = horizontal();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setMinimumHeight(dp(67));
         row.setPadding(dp(11), dp(8), dp(12), dp(8));
-        row.setBackground(tappable(PANEL, 12, BORDER));
+        row.setBackground(tappable(PANEL, 8, 0));
         row.addView(iconBadge(symbol), lp(dp(38), dp(38)));
         LinearLayout titles = vertical();
         titles.addView(title(heading, 15));
-        add(titles, text(detail, 12, MUTED, false), 2);
+        add(titles, detail, 2);
         LinearLayout.LayoutParams labels = weighted(1f);
         labels.setMargins(dp(10), 0, dp(5), 0);
         row.addView(titles, labels);
-        row.addView(text("›", 23, ACCENT, false));
+        row.addView(new Icon(this, "next-row", MUTED), lp(dp(16), dp(16)));
         row.setFocusable(true);
-        row.setContentDescription(heading + ". " + detail);
+        if (detail.length() > 0) row.setContentDescription(heading + ". " + detail.getText());
         row.setOnClickListener(view -> action.run());
         pressMotion(row);
         return row;
@@ -1768,6 +1907,44 @@ public final class MainActivity extends Activity {
 
     private static int bounded(int value, int max) { return Math.max(0, Math.min(max, value)); }
 
+    private TextView sectionLabel(String title) {
+        TextView label = text(title, 17, TEXT, true);
+        if (Build.VERSION.SDK_INT >= 28) label.setAccessibilityHeading(true);
+        return label;
+    }
+
+    private LinearLayout sectionTitle(String symbol, String heading) {
+        return sectionTitle(symbol, sectionLabel(heading));
+    }
+
+    private LinearLayout sectionTitle(String symbol, TextView title) {
+        LinearLayout row = horizontal();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(new Icon(this, symbol, ACCENT), lp(dp(21), dp(21)));
+        title.setPadding(dp(8), 0, 0, 0);
+        row.addView(title, weighted(1));
+        return row;
+    }
+
+    private View instruction(String symbol, String heading, String detail) {
+        LinearLayout row = horizontal();
+        row.setPadding(0, dp(7), 0, dp(7));
+        row.addView(iconBadge(symbol), lp(dp(36), dp(36)));
+        LinearLayout words = vertical();
+        words.setPadding(dp(10), 0, 0, 0);
+        words.addView(title(heading, 15));
+        add(words, text(detail, 13, MUTED, false), 3);
+        row.addView(words, weighted(1));
+        return row;
+    }
+
+    private void separator(LinearLayout container) {
+        View line = new View(this);
+        line.setBackgroundColor(BORDER);
+        line.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        container.addView(line, lp(-1, dp(1)));
+    }
+
     private LinearLayout page(String heading) {
         LinearLayout column = new LinearLayout(this) {
             @Override protected void onMeasure(int widthSpec, int heightSpec) {
@@ -1776,8 +1953,12 @@ public final class MainActivity extends Activity {
             }
         };
         column.setOrientation(LinearLayout.VERTICAL);
-        column.setPadding(dp(wide ? 25 : 15), dp(wide ? 24 : 13), dp(wide ? 25 : 15), dp(18));
-        if (heading != null) column.addView(editorial(heading, 32, TEXT));
+        column.setPadding(dp(wide ? 26 : 16), dp(wide ? 20 : 14), dp(wide ? 26 : 16), dp(18));
+        if (heading != null) {
+            TextView headingView = editorial(heading, wide ? 30 : 27, TEXT);
+            if (Build.VERSION.SDK_INT >= 28) headingView.setAccessibilityHeading(true);
+            column.addView(headingView);
+        }
         return column;
     }
 
@@ -1790,7 +1971,7 @@ public final class MainActivity extends Activity {
     }
 
     private LinearLayout columns(View left, View right) {
-        if (wide) return tilePair(left, right);
+        if (wide && getResources().getConfiguration().screenWidthDp - 145 >= 530 * getResources().getConfiguration().fontScale) return tilePair(left, right);
         LinearLayout stacked = vertical();
         stacked.addView(left, lp(-1, -2));
         add(stacked, right, 9);
@@ -1824,7 +2005,7 @@ public final class MainActivity extends Activity {
     private View iconBadge(String name) {
         Icon icon = new Icon(this, name, ACCENT);
         icon.setPadding(dp(8), dp(8), dp(8), dp(8));
-        icon.setBackground(surface(ACCENT_SURFACE, 10, 0));
+        icon.setBackground(surface(ACCENT_SURFACE, 9, 0));
         return icon;
     }
 
@@ -1843,8 +2024,8 @@ public final class MainActivity extends Activity {
                 new int[]{MUTED, primary ? ON_ACCENT : TEXT}));
         pressMotion(result);
         StateListDrawable fill = new StateListDrawable();
-        fill.addState(new int[]{-android.R.attr.state_enabled}, surface(WELL, 12, BORDER));
-        fill.addState(new int[0], tappable(primary ? ACCENT : WELL, 12, primary ? ACCENT : BORDER));
+        fill.addState(new int[]{-android.R.attr.state_enabled}, surface(WELL, 9, BORDER));
+        fill.addState(new int[0], tappable(primary ? ACCENT : WELL, 9, primary ? ACCENT : 0));
         result.setBackground(fill);
         return result;
     }
@@ -1871,7 +2052,7 @@ public final class MainActivity extends Activity {
         input.setSingleLine((inputType & InputType.TYPE_TEXT_FLAG_MULTI_LINE) == 0);
         input.setPadding(dp(12), dp(10), dp(12), dp(10));
         input.setMinHeight(dp(48));
-        input.setBackground(surface(BG, 11, BORDER));
+        input.setBackground(surface(WELL, 9, BORDER));
         return input;
     }
 
@@ -1888,12 +2069,24 @@ public final class MainActivity extends Activity {
 
     private TextView editorial(String label, int size, int tint) {
         TextView view = text(label, size, tint, false);
-        view.setTypeface(Typeface.create("serif", Typeface.NORMAL));
+        view.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        view.setLetterSpacing(-.035f);
         return view;
     }
 
     private static boolean animationsEnabled() {
         return Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled();
+    }
+
+    private void reveal(View view, int distance, int duration) {
+        view.animate().cancel();
+        view.setAlpha(1f);
+        view.setTranslationY(0f);
+        if (!view.isShown() || !animationsEnabled()) return;
+        view.setAlpha(.55f);
+        view.setTranslationY(dp(distance));
+        view.animate().alpha(1f).translationY(0).setStartDelay(0).setDuration(duration)
+                .setInterpolator(new DecelerateInterpolator()).start();
     }
 
     private static void pressMotion(View view) {
@@ -1930,7 +2123,7 @@ public final class MainActivity extends Activity {
     }
 
     private RippleDrawable tappable(int color, int radius, int stroke) {
-        return new RippleDrawable(ColorStateList.valueOf(dark ? 0x40FFC9DE : 0x30823D5F), surface(color, radius, stroke), surface(Color.WHITE, radius, 0));
+        return new RippleDrawable(ColorStateList.valueOf(dark ? 0x339DF5D1 : 0x221155C2), surface(color, radius, stroke), surface(Color.WHITE, radius, 0));
     }
 
     private LinearLayout vertical() { LinearLayout column = new LinearLayout(this); column.setOrientation(LinearLayout.VERTICAL); return column; }
@@ -1944,39 +2137,75 @@ public final class MainActivity extends Activity {
     }
     private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
 
+    private final class NavigationBar extends LinearLayout {
+        private final Paint marker = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final ValueAnimator travel = new ValueAnimator();
+        private float position;
+
+        NavigationBar() {
+            super(MainActivity.this);
+            setOrientation(wide ? VERTICAL : HORIZONTAL);
+            marker.setColor(ACCENT);
+            travel.setDuration(220);
+            travel.setInterpolator(new DecelerateInterpolator());
+            travel.addUpdateListener(value -> { position = (float) value.getAnimatedValue(); invalidate(); });
+        }
+
+        void select(int index, boolean animate) {
+            travel.cancel();
+            if (!animate || !isShown()) {
+                position = index;
+                invalidate();
+                return;
+            }
+            travel.setFloatValues(position, index);
+            travel.start();
+        }
+
+        private float center(int index) {
+            View item = getChildAt(index);
+            return wide ? (item.getTop() + item.getBottom()) / 2f : (item.getLeft() + item.getRight()) / 2f;
+        }
+
+        @Override protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            int first = (int) position;
+            int last = Math.min(first + 1, getChildCount() - 1);
+            float at = center(first) + (center(last) - center(first)) * (position - first);
+            int edge = dp(3), span = dp(12);
+            if (wide) canvas.drawRoundRect(dp(2), at - span, dp(2) + edge, at + span, edge, edge, marker);
+            else canvas.drawRoundRect(at - span, 0, at + span, edge, edge, edge, marker);
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            travel.cancel();
+            super.onDetachedFromWindow();
+        }
+    }
+
     private final class NavItem extends LinearLayout {
         private final Icon icon;
         private final TextView caption;
         NavItem(String label, String symbol) {
             super(MainActivity.this);
-            setOrientation(wide ? HORIZONTAL : VERTICAL);
-            setGravity(wide ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
-            setMinimumHeight(dp(54));
-            setPadding(dp(wide ? 9 : 1), dp(5), dp(wide ? 7 : 1), dp(5));
+            setOrientation(VERTICAL);
+            setGravity(Gravity.CENTER);
+            setMinimumHeight(dp(wide ? 62 : 54));
+            setPadding(dp(1), dp(4), dp(1), dp(4));
             setFocusable(true);
-            pressMotion(this);
             icon = new Icon(MainActivity.this, symbol, MUTED);
-            addView(icon, lp(dp(21), dp(21)));
-            caption = text(label, wide ? 12 : 10, MUTED, true);
-            caption.setGravity(wide ? Gravity.START | Gravity.CENTER_VERTICAL : Gravity.CENTER);
-            LinearLayout.LayoutParams labelSpace = wide ? weighted(1f) : lp(-1, -2);
-            labelSpace.setMarginStart(dp(wide ? 7 : 0));
-            labelSpace.topMargin = dp(wide ? 0 : 3);
-            addView(caption, labelSpace);
+            addView(icon, lp(dp(22), dp(22)));
+            caption = text(label, wide ? 12 : compactHeader ? 10 : 11, MUTED, true);
+            caption.setGravity(Gravity.CENTER);
+            MainActivity.this.add(this, caption, 2);
             setContentDescription(label);
+            setBackground(tappable(HEADER, 9, 0));
         }
 
         void active(boolean selected) {
-            boolean changed = isSelected() != selected;
             setSelected(selected);
             icon.tint(selected ? ACCENT : MUTED);
             caption.setTextColor(selected ? ACCENT : MUTED);
-            setBackground(tappable(selected ? ACCENT_SURFACE : HEADER, 12, 0));
-            if (changed && selected && isShown() && animationsEnabled()) {
-                icon.animate().cancel();
-                icon.setTranslationY(dp(3));
-                icon.animate().translationY(0f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
-            }
         }
     }
 

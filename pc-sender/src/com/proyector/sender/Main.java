@@ -21,9 +21,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 
 public final class Main {
-    private static final Color INK = new Color(0x291D3C);
-    private static final Color[] LIGHT = palette(0xFDFBFC, 0xFFFFFF, 0xF5F0F4, 0xE4D8DE, 0x291D3C, 0x665968, 0x833A5C, 0x933F26);
-    private static final Color[] DARK = palette(0x19151F, 0x29232F, 0x342D3C, 0x524559, 0xF8F1F5, 0xCCBBC9, 0xF2AFC5, 0xFFBF9F);
+    private static final Color INK = new Color(0x101E38);
+    private static final Color[] LIGHT = palette(0xF1F5F9, 0xFFFFFF, 0xEBF1F7, 0xCEDBE6, 0x12253A, 0x4E6277, 0x1155C2, 0x963B1E);
+    private static final Color[] DARK = palette(0x0C1524, 0x172639, 0x20334A, 0x364A60, 0xF0F6FF, 0xB4C4D6, 0x9DF5D1, 0xFFBA96);
     private static Color BACKGROUND, CARD, WELL, BORDER, TEXT, MUTED, ACCENT, AMBER;
     private static Color[] currentPalette = LIGHT;
     static { usePalette(LIGHT); }
@@ -54,9 +54,9 @@ public final class Main {
         if (part instanceof Container group) for (Component child : group.getComponents()) recolor(child, from);
     }
 
-    private static final Color PEACH = new Color(0xFFB295);
-    private static final Color ON_INK = new Color(0xFFF6EC);
-    private static final Color SUBTLE_INK = new Color(0xE5CDD8);
+    private static final Color MINT = new Color(0x9DF5D1);
+    private static final Color ON_INK = new Color(0xF3FAFF);
+    private static final Color SUBTLE_INK = new Color(0xD4E6FB);
     private static final String[] SECTIONS = {"Vinculación", "Pantallas", "Red"};
 
     public static void main(String[] args) throws IOException {
@@ -85,6 +85,7 @@ public final class Main {
         UIManager.put("ComboBox.font", new Font("Segoe UI", Font.PLAIN, 13));
         UIManager.put("OptionPane.background", CARD);
         UIManager.put("Panel.background", CARD);
+        UIManager.put("Button.disabledText", MUTED);
         UIManager.put("OptionPane.messageForeground", TEXT);
     }
 
@@ -102,9 +103,9 @@ public final class Main {
         private final String computer = Wire.displayName(System.getenv().getOrDefault("COMPUTERNAME", "Windows"));
         private final Preferences preferences = Preferences.userRoot().node("/orbivia/sender");
         private final WindowsControl controls = new WindowsControl();
-        private final JLabel connection = label("Emisor detenido", 13, SUBTLE_INK, true);
-        private final JLabel video = label("Imagen en pausa", 12, SUBTLE_INK, false);
-        private final JLabel videoLimit = label("", 12, SUBTLE_INK, false);
+        private final JLabel connection = label("Emisor detenido", 13, MUTED, true);
+        private final JLabel video = label("Imagen en pausa", 12, MUTED, false);
+        private final JLabel videoLimit = label("", 12, ACCENT, true);
         private final JLabel pin = label("··· ···", 38, ACCENT, true);
         private final JLabel identityLabel = label("Preparando identidad…", 12, MUTED, false);
         private final JLabel displayHint = label("Buscando pantallas en Windows…", 12, MUTED, false);
@@ -113,26 +114,28 @@ public final class Main {
         private final JButton copyPin = button("Copiar código", false);
         private final JTextField port = new JTextField(Integer.toString(
                 Math.clamp(preferences.getInt("port", Wire.PORT), 1024, 65535)), 5);
-        private final JComboBox<Option> desktop = new JComboBox<>();
-        private final JComboBox<Option> secondary = new JComboBox<>();
-        private final JComboBox<String> resolution = new JComboBox<>(Wire.RESOLUTIONS.clone());
-        private final JComboBox<String> fps = new JComboBox<>(new String[]{"12 FPS", "20 FPS", "30 FPS", "45 FPS", "60 FPS"});
+        private final JComboBox<Option> desktop = new FieldCombo<>();
+        private final JComboBox<Option> secondary = new FieldCombo<>();
+        private final JComboBox<String> resolution = new FieldCombo<>(Wire.RESOLUTIONS.clone());
+        private final JComboBox<String> fps = new FieldCombo<>(new String[]{"12 FPS", "20 FPS", "30 FPS", "45 FPS", "60 FPS"});
         private final JButton usbSetup = button("Preparar cable ADB", false);
         private final JButton virtualSetup = button("Preparar monitor virtual", true);
         private final JPanel routes = column();
         private final JLabel lanState = label("Buscando adaptador", 12, MUTED, false);
         private final JLabel usbState = label("Conecta el cable", 12, MUTED, false);
         private final JLabel vpnState = label("Abre Tailscale", 12, MUTED, false);
-        private final JPanel usbSection = column();
-        private final JPanel vpnSection = column();
+        private final JPanel usbSection = card();
+        private final JPanel vpnSection = card();
         private final CardLayout layout = new CardLayout();
         private final MotionPane section = new MotionPane(layout);
+        private final TabStrip tabs = new TabStrip();
+        private final MonitorMap monitorMap = new MonitorMap();
         private final JButton[] navigation = new JButton[SECTIONS.length];
         private final AtomicReference<Displays.Settings> settings = new AtomicReference<>(new Displays.Settings(
                 preferences.get("desktop", ""), preferences.get("secondary", ""),
                 Math.clamp(preferences.getInt("quality", 3), 0, Wire.RESOLUTIONS.length - 1),
                 Wire.FRAME_RATES[Math.clamp(preferences.getInt("rateIndex", 4), 0, Wire.FRAME_RATES.length - 1)]));
-        private final JComboBox<String> appearance = new JComboBox<>(new String[]{"Sistema", "Blanco", "Oscuro"});
+        private final JComboBox<String> appearance = new FieldCombo<>(new String[]{"Sistema", "Blanco", "Oscuro"});
         private int themeGeneration;
         private HostIdentity identity;
         private HostServer server;
@@ -145,25 +148,32 @@ public final class Main {
         SenderWindow() {
             super("Orbivía · Emisor");
             setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            setMinimumSize(new Dimension(660, 510));
-            setSize(938, 610);
+            setMinimumSize(new Dimension(640, 490));
+            setSize(960, 685);
             setLocationByPlatform(true);
             setIconImage(mark(48));
 
-            JPanel root = new JPanel(new BorderLayout(18, 0));
-            root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 18));
+            JPanel root = new JPanel(new BorderLayout());
             root.setBackground(BACKGROUND);
             setContentPane(root);
-            root.add(sidebar(), BorderLayout.WEST);
-            JPanel work = new JPanel(new BorderLayout(0, 12));
+            root.add(header(), BorderLayout.NORTH);
+            JPanel work = new JPanel(new BorderLayout());
+            work.setBorder(BorderFactory.createEmptyBorder(13, 19, 12, 19));
             work.setOpaque(false);
             section.add(page(pairingCard()), SECTIONS[0]);
             section.add(page(displayCard()), SECTIONS[1]);
             section.add(page(networkCard()), SECTIONS[2]);
             work.add(section, BorderLayout.CENTER);
-            message.setBorder(BorderFactory.createEmptyBorder(5, 9, 3, 0));
-            work.add(message, BorderLayout.SOUTH);
             root.add(work, BorderLayout.CENTER);
+            JPanel footer = new JPanel(new BorderLayout(12, 0));
+            footer.setBackground(CARD);
+            footer.setBorder(BorderFactory.createEmptyBorder(9, 20, 10, 20));
+            footer.add(message, BorderLayout.CENTER);
+            JPanel stats = inline();
+            stats.add(video);
+            stats.add(videoLimit);
+            footer.add(stats, BorderLayout.EAST);
+            root.add(footer, BorderLayout.SOUTH);
             selectSection(0, false);
 
             toggle.setEnabled(false);
@@ -189,7 +199,7 @@ public final class Main {
                         showMessage("El emisor sigue en la barra de tareas. Usa Salir para cerrarlo.", false);
                     }
                 }
-                @Override public void windowClosed(WindowEvent event) { refresh.stop(); section.motion.stop(); stopServer(); }
+                @Override public void windowClosed(WindowEvent event) { refresh.stop(); section.motion.stop(); tabs.motion.stop(); stopServer(); }
             });
             loadIdentity();
         }
@@ -217,49 +227,55 @@ public final class Main {
             repaint();
         }
 
-        private JPanel sidebar() {
-            JPanel side = new Surface(INK, new Color(0x432A54), 24);
-            side.setLayout(new BoxLayout(side, BoxLayout.Y_AXIS));
-            side.setBorder(BorderFactory.createEmptyBorder(20, 16, 18, 16));
-            side.setPreferredSize(new Dimension(211, 0));
-            addSpaced(side, new JLabel(new ImageIcon(mark(59))), 0);
-            addSpaced(side, editorial("Orbivía", 33, ON_INK), 8);
+        private JPanel header() {
+            JPanel chrome = new JPanel(new BorderLayout());
+            JPanel head = new JPanel(new BorderLayout(16, 0));
+            head.setBackground(INK);
+            head.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 16));
+            JPanel brand = new JPanel(new BorderLayout(10, 0));
+            brand.setOpaque(false);
+            brand.add(new JLabel(new ImageIcon(mark(43))), BorderLayout.WEST);
+            JPanel names = column();
+            addSpaced(names, editorial("Orbivía", 22, ON_INK), 0);
             JLabel name = label(computer, 12, SUBTLE_INK, false);
             name.setToolTipText(computer);
-            addSpaced(side, name, 3);
-            JSeparator divider = new JSeparator();
-            divider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-            divider.setForeground(new Color(0x59466D));
-            addSpaced(side, divider, 21);
+            addSpaced(names, name, 0);
+            brand.add(names);
+            head.add(brand, BorderLayout.CENTER);
+            appearance.setSelectedIndex(Math.clamp(preferences.getInt("appearance", 0), 0, 2));
+            appearance.getAccessibleContext().setAccessibleName("Apariencia");
+            appearance.addActionListener(event -> updateAppearance());
+            JPanel utilities = inline();
+            JLabel themeLabel = label("Apariencia", 12, SUBTLE_INK, false);
+            themeLabel.setLabelFor(appearance);
+            utilities.add(themeLabel);
+            utilities.add(appearance);
+            JButton exit = button("Salir", false);
+            exit.addActionListener(event -> dispose());
+            utilities.add(exit);
+            head.add(utilities, BorderLayout.EAST);
+            chrome.add(head, BorderLayout.NORTH);
+
+            JPanel bar = new JPanel(new BorderLayout(10, 0));
+            bar.setBackground(CARD);
+            bar.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 20));
             for (int i = 0; i < SECTIONS.length; i++) {
                 int index = i;
                 JButton tab = new StyledButton(SECTIONS[i], false, true);
                 tab.setIcon(new SectionIcon(i));
-                tab.setIconTextGap(10);
-                tab.setHorizontalAlignment(SwingConstants.LEADING);
-                tab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                tab.setIconTextGap(7);
                 tab.addActionListener(event -> selectSection(index, true));
                 navigation[i] = tab;
-                addSpaced(side, tab, i == 0 ? 11 : 5);
+                tabs.add(tab);
             }
-            side.add(Box.createVerticalGlue());
-            appearance.setSelectedIndex(Math.clamp(preferences.getInt("appearance", 0), 0, 2));
-            appearance.getAccessibleContext().setAccessibleName("Apariencia");
-            appearance.setMaximumSize(new Dimension(160, 30));
-            appearance.addActionListener(event -> updateAppearance());
-            addSpaced(side, label("Apariencia", 12, SUBTLE_INK, false), 8);
-            addSpaced(side, appearance, 3);
-            addSpaced(side, connection, 10);
-            addSpaced(side, video, 4);
-            addSpaced(side, videoLimit, 4);
-            JButton exit = new StyledButton("Salir", false, true);
-            exit.addActionListener(event -> dispose());
-            addSpaced(side, exit, 8);
-            return side;
+            bar.add(tabs, BorderLayout.WEST);
+            bar.add(connection, BorderLayout.EAST);
+            chrome.add(bar, BorderLayout.SOUTH);
+            return chrome;
         }
 
         private static JScrollPane page(JPanel contents) {
-            JPanel stack = new JPanel(new BorderLayout());
+            JPanel stack = new ScrollColumn();
             stack.setOpaque(false);
             stack.add(contents, BorderLayout.NORTH);
             JScrollPane scroll = new JScrollPane(stack);
@@ -272,29 +288,34 @@ public final class Main {
 
         private void selectSection(int selected, boolean animate) {
             if (animate && navigation[selected].isSelected()) return;
-            for (int i = 0; i < navigation.length; i++) navigation[i].setSelected(i == selected);
+            for (int i = 0; i < navigation.length; i++) {
+                navigation[i].setSelected(i == selected);
+                navigation[i].setForeground(i == selected ? ACCENT : MUTED);
+            }
+            tabs.select(selected, animate);
             layout.show(section, SECTIONS[selected]);
             if (animate) section.enter();
         }
 
         private JPanel pairingCard() {
-            JPanel card = card();
-            addSpaced(card, editorial("Vincular Android", 29, TEXT), 0);
-            addSpaced(card, label("Inicia el emisor y abre Conexión en Android.", 12, MUTED, false), 6);
-            JPanel codeWell = new Surface(INK, new Color(0x432A54), 17);
-            codeWell.setLayout(new BorderLayout(10, 0));
-            codeWell.setBorder(BorderFactory.createEmptyBorder(8, 13, 8, 10));
-            pin.setFont(new Font("Consolas", Font.BOLD, 40));
-            pin.setForeground(PEACH);
-            codeWell.add(pin, BorderLayout.CENTER);
-            codeWell.add(copyPin, BorderLayout.EAST);
-            addSpaced(card, codeWell, 15);
-            addSpaced(card, label("Identidad de este equipo", 12, TEXT, true), 13);
-            identityLabel.setFont(new Font("Consolas", Font.PLAIN, 14));
-            addSpaced(card, identityLabel, 4);
-            addSpaced(card, label("Compara este texto la primera vez que conectes.", 12, MUTED, false), 4);
+            JPanel page = column();
+            JPanel hero = new StudioBanner();
+            hero.setLayout(new BorderLayout(12, 0));
+            hero.setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 14));
+            JPanel details = column();
+            addSpaced(details, editorial("Vincular Android", 28, ON_INK), 0);
+            addSpaced(details, label("Código de conexión", 13, SUBTLE_INK, false), 9);
+            pin.setFont(new Font("Consolas", Font.BOLD, 44));
+            pin.setForeground(MINT);
+            pin.getAccessibleContext().setAccessibleName("Código de conexión");
+            addSpaced(details, pin, 1);
+            addSpaced(details, copyPin, 3);
+            hero.add(details, BorderLayout.CENTER);
+            hero.add(new DeviceImage(), BorderLayout.EAST);
+            addSpaced(page, hero, 0);
 
-            JPanel actions = new JPanel(new BorderLayout(10, 0));
+            JPanel setup = card();
+            JPanel actions = new JPanel(new BorderLayout(12, 0));
             actions.setOpaque(false);
             port.setFont(new Font("Consolas", Font.PLAIN, 14));
             port.setBackground(WELL);
@@ -303,20 +324,34 @@ public final class Main {
             port.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER),
                     BorderFactory.createEmptyBorder(9, 9, 9, 9)));
             port.getAccessibleContext().setAccessibleName("Puerto del emisor");
-            actions.add(field("Puerto", port), BorderLayout.WEST);
-            actions.add(toggle, BorderLayout.CENTER);
-            addSpaced(card, actions, 15);
-            JPanel available = new JPanel(new GridLayout(1, 3, 8, 0));
-            available.setOpaque(false);
+            actions.add(port, BorderLayout.CENTER);
+            JLabel portLabel = label("Puerto", 13, MUTED, true);
+            portLabel.setLabelFor(port);
+            actions.add(portLabel, BorderLayout.WEST);
+            actions.add(toggle, BorderLayout.EAST);
+            JPanel identityInfo = column();
+            addSpaced(identityInfo, label("Identidad de este equipo", 14, TEXT, true), 0);
+            identityLabel.setFont(new Font("Consolas", Font.PLAIN, 15));
+            addSpaced(identityInfo, identityLabel, 4);
+            addSpaced(identityInfo, label("Compárala al vincular por primera vez.", 12, MUTED, false), 2);
+            JPanel connectionSetup = column();
+            addSpaced(connectionSetup, label("Emisor de Windows", 14, TEXT, true), 0);
+            addSpaced(connectionSetup, actions, 7);
+            JPanel setupColumns = grid(2);
+            setupColumns.add(connectionSetup);
+            setupColumns.add(identityInfo);
+            addSpaced(setup, setupColumns, 0);
+            addSpaced(page, setup, 10);
+            JPanel available = grid(3);
             available.add(routeTile("Wi-Fi / LAN", lanState, 2, null));
-            available.add(routeTile("Cable USB", usbState, 1, usbSection));
+            available.add(routeTile("Cable USB", usbState, 3, usbSection));
             available.add(routeTile("Otra red", vpnState, 0, vpnSection));
-            addSpaced(card, available, 13);
-            return card;
+            addSpaced(page, available, 10);
+            return page;
         }
 
         private JPanel routeTile(String title, JLabel status, int glyph, JComponent destination) {
-            JPanel tile = new Surface(WELL, BORDER, 14);
+            JPanel tile = new Surface(CARD, BORDER, 16);
             tile.setLayout(new BoxLayout(tile, BoxLayout.Y_AXIS));
             tile.setBorder(BorderFactory.createEmptyBorder(7, 8, 8, 8));
             JButton open = button(title, false);
@@ -329,18 +364,29 @@ public final class Main {
                         new Rectangle(0, 0, destination.getWidth(), destination.getHeight())));
             });
             addSpaced(tile, open, 0);
-            addSpaced(tile, status, 5);
+            status.setBorder(BorderFactory.createEmptyBorder(0, 5, 1, 0));
+            addSpaced(tile, status, 6);
             return tile;
         }
 
         private JPanel displayCard() {
-            JPanel card = card();
-            addSpaced(card, editorial("Pantallas e imagen", 29, TEXT), 0);
-            addSpaced(card, field("Vista de escritorio", desktop), 10);
-            addSpaced(card, field("Segundo monitor", secondary), 8);
-            addSpaced(card, displayHint, 6);
-            JPanel prepare = new JPanel(new GridLayout(1, 2, 7, 0));
-            prepare.setOpaque(false);
+            JPanel page = column();
+            addSpaced(page, editorial("Pantallas e imagen", 27, TEXT), 0);
+            JPanel targets = card();
+            addSpaced(targets, label("Destino de la imagen", 16, TEXT, true), 0);
+            addSpaced(targets, field("Escritorio remoto", desktop), 9);
+            addSpaced(targets, field("Segundo monitor", secondary), 7);
+            JPanel map = new StudioBanner();
+            map.setLayout(new BorderLayout(0, 5));
+            map.setBorder(BorderFactory.createEmptyBorder(10, 15, 11, 15));
+            map.add(monitorMap, BorderLayout.CENTER);
+            displayHint.setForeground(ON_INK);
+            map.add(displayHint, BorderLayout.SOUTH);
+            JPanel devices = grid(2);
+            devices.add(targets);
+            devices.add(map);
+            addSpaced(page, devices, 12);
+            JPanel prepare = grid(2);
             virtualSetup.addActionListener(event -> prepareMonitor());
             JButton extend = button("Extender escritorio", false);
             extend.addActionListener(event -> {
@@ -351,12 +397,14 @@ public final class Main {
             });
             prepare.add(virtualSetup);
             prepare.add(extend);
-            addSpaced(card, prepare, 8);
+            addSpaced(page, prepare, 9);
+            JPanel transmission = card();
+            addSpaced(transmission, label("Límites de transmisión", 16, TEXT, true), 0);
             JPanel limits = new JPanel(new GridLayout(1, 2, 10, 0));
             limits.setOpaque(false);
             limits.add(field("Resolución máxima", resolution));
             limits.add(field("Velocidad máxima", fps));
-            addSpaced(card, limits, 10);
+            addSpaced(transmission, limits, 9);
             JButton openSettings = button("Configuración de pantallas", false);
             openSettings.addActionListener(event -> {
                 try { new ProcessBuilder("explorer.exe", "ms-settings:display").start(); }
@@ -368,13 +416,12 @@ public final class Main {
                 fps.setSelectedIndex(Wire.FRAME_RATES.length - 1);
                 showMessage("Límites restablecidos a 1080p y 60 FPS.", false);
             });
-            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
-            buttons.setOpaque(false);
+            JPanel buttons = grid(2);
             buttons.add(openSettings);
-            buttons.add(Box.createHorizontalStrut(8));
             buttons.add(resetLimits);
-            addSpaced(card, buttons, 12);
-            return card;
+            addSpaced(transmission, buttons, 11);
+            addSpaced(page, transmission, 10);
+            return page;
         }
 
         private void openPage(String url) {
@@ -422,24 +469,30 @@ public final class Main {
         }
 
         private JPanel networkCard() {
-            JPanel card = card();
-            addSpaced(card, editorial("Direcciones de red", 29, TEXT), 0);
-            addSpaced(card, label("Usa la dirección correspondiente para una conexión manual.", 12, MUTED, false), 5);
-            addSpaced(card, routes, 10);
-            addSpaced(usbSection, label("Cable USB", 16, TEXT, true), 0);
-            addSpaced(usbSection, label("<html>Conecta un cable de datos y activa Compartir Internet por USB en Android. La nueva dirección aparecerá arriba.</html>", 13, MUTED, false), 4);
+            JPanel page = column();
+            addSpaced(page, editorial("Red y cable", 27, TEXT), 0);
+            JPanel addresses = card();
+            addSpaced(addresses, label("Direcciones de este equipo", 16, TEXT, true), 0);
+            addSpaced(addresses, label("Copia una dirección para introducirla en Android.", 13, MUTED, false), 4);
+            addSpaced(addresses, routes, 8);
+            addSpaced(page, addresses, 11);
+            addSpaced(usbSection, sectionTitle("Cable USB", 3), 0);
+            addSpaced(usbSection, new WrapText("Conecta un cable de datos y activa Compartir Internet por USB en Android. La dirección aparecerá en la lista."), 4);
             usbSetup.setToolTipText("Para teléfonos con depuración USB autorizada y Android Platform Tools en Windows");
             usbSetup.setEnabled(false);
             usbSetup.addActionListener(event -> prepareCable());
             addSpaced(usbSection, usbSetup, 6);
-            addSpaced(card, usbSection, 15);
-            addSpaced(vpnSection, label("Otra red", 16, TEXT, true), 0);
-            addSpaced(vpnSection, label("<html>Conecta ambos equipos a Tailscale. Copia la dirección Tailscale y pégala en Conexión → Otra red en Android.</html>", 13, MUTED, false), 4);
+
+            addSpaced(vpnSection, sectionTitle("Otra red", 2), 0);
+            addSpaced(vpnSection, new WrapText("Abre Tailscale en ambos equipos. Copia la dirección de la PC y pégala en Conexión → Otra red en Android."), 4);
             JButton vpn = button("Obtener Tailscale", false);
             vpn.addActionListener(event -> openPage("https://tailscale.com/download/windows"));
             addSpaced(vpnSection, vpn, 6);
-            addSpaced(card, vpnSection, 13);
-            return card;
+            JPanel setup = grid(2);
+            setup.add(usbSection);
+            setup.add(vpnSection);
+            addSpaced(page, setup, 10);
+            return page;
         }
 
         private void loadIdentity() {
@@ -524,7 +577,7 @@ public final class Main {
         private void setConnection(String value, boolean connected) {
             connection.setToolTipText(value);
             connection.setText(connected ? "Android conectado" : value);
-            connection.setForeground(connected ? PEACH : SUBTLE_INK);
+            connection.setForeground(connected ? ACCENT : MUTED);
         }
 
         private void refreshHardware() {
@@ -550,8 +603,7 @@ public final class Main {
                 Displays.Choice resolved = displays.secondary(desiredSecondary);
                 select(secondary, !desiredSecondary.isEmpty() && resolved != null ? resolved.id() : desiredSecondary);
                 loadingDisplays = false;
-                displayHint.setText(displays.secondary(desiredSecondary) == null
-                        ? displaysHint(displays) : "Pantalla adicional lista · " + displays.secondary(desiredSecondary).name());
+                updateDisplayMap(displays);
             }
             List<HostNetwork.Route> active = HostNetwork.routes();
             if (!active.equals(currentRoutes) || routes.getComponentCount() == 0) {
@@ -565,11 +617,16 @@ public final class Main {
                     String ip = route.address().getHostAddress();
                     JPanel row = new JPanel(new BorderLayout(10, 0));
                     row.setOpaque(false);
-                    row.add(label(route.label() + "   ·   " + ip, 13, TEXT, true), BorderLayout.CENTER);
+                    JPanel address = column();
+                    addSpaced(address, label(route.label(), 12, MUTED, false), 0);
+                    JLabel endpoint = label(ip, 16, TEXT, true);
+                    endpoint.setFont(new Font("Consolas", Font.BOLD, 16));
+                    addSpaced(address, endpoint, 2);
+                    row.add(address, BorderLayout.CENTER);
                     JButton copy = button("Copiar dirección", false);
                     copy.addActionListener(event -> copy(ip + ":" + (server == null ? port.getText().trim() : server.port()), "Dirección y puerto copiados"));
                     row.add(copy, BorderLayout.EAST);
-                    addSpaced(routes, row, 5);
+                    addSpaced(routes, row, 7);
                 }
                 routes.revalidate();
                 routes.repaint();
@@ -584,9 +641,13 @@ public final class Main {
             status.setForeground(ip == null ? MUTED : ACCENT);
         }
 
-        private String displaysHint(Displays displays) {
-            return displays.choices().size() > 1 ? "Elige una de las pantallas adicionales disponibles."
-                    : "Una pantalla activa. Prepara un monitor virtual o conecta otra pantalla.";
+        private void updateDisplayMap(Displays displays) {
+            Displays.Choice target = displays.secondary(settings.get().secondary());
+            monitorMap.available(target != null);
+            String hint = target != null ? target.name() : displays.choices().size() > 1
+                    ? "Elige la pantalla adicional" : "Una pantalla activa";
+            displayHint.setText(hint);
+            displayHint.setToolTipText(hint);
         }
 
         private void updateSettings() {
@@ -600,8 +661,7 @@ public final class Main {
             preferences.putInt("quality", quality);
             preferences.putInt("rateIndex", rate);
             updateVideoLimit();
-            displayHint.setText(Displays.read().secondary(settings.get().secondary()) == null
-                    ? "Sin pantalla adicional activa en Windows" : "Pantalla adicional disponible");
+            updateDisplayMap(Displays.read());
         }
 
         private void updateVideoLimit() {
@@ -643,6 +703,25 @@ public final class Main {
         return panel;
     }
 
+    private static JLabel sectionTitle(String text, int symbol) {
+        JLabel title = label(text, 16, TEXT, true);
+        title.setIcon(new SectionIcon(symbol));
+        title.setIconTextGap(8);
+        return title;
+    }
+
+    private static JPanel grid(int columns) {
+        JPanel row = new JPanel(new GridLayout(1, columns, 12, 0));
+        row.setOpaque(false);
+        return row;
+    }
+
+    private static JPanel inline() {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
+        row.setOpaque(false);
+        return row;
+    }
+
     private static JPanel column() {
         JPanel panel = new JPanel();
         panel.setOpaque(false);
@@ -660,6 +739,7 @@ public final class Main {
     private static void addSpaced(JPanel panel, JComponent child, int margin) {
         if (margin > 0) panel.add(Box.createVerticalStrut(margin));
         child.setAlignmentX(Component.LEFT_ALIGNMENT);
+        if (child instanceof JLabel) child.setMaximumSize(new Dimension(Integer.MAX_VALUE, child.getPreferredSize().height));
         panel.add(child);
     }
 
@@ -676,7 +756,7 @@ public final class Main {
 
     private static JLabel editorial(String value, int size, Color color) {
         JLabel title = label(value, size, color, false);
-        title.setFont(new Font("Georgia", Font.PLAIN, size));
+        title.setFont(new Font("Segoe UI", Font.BOLD, size));
         return title;
     }
 
@@ -686,28 +766,17 @@ public final class Main {
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         graphics.scale(size / 108.0, size / 108.0);
         graphics.setColor(INK);
-        graphics.fillRoundRect(4, 4, 100, 100, 50, 50);
-        Path2D ring = new Path2D.Float();
-        ring.moveTo(71, 27);
-        ring.curveTo(57, 19, 38, 23, 27, 36);
-        ring.curveTo(16, 49, 19, 69, 31, 80);
-        ring.curveTo(43, 91, 62, 90, 74, 79);
-        ring.lineTo(64, 69);
-        ring.curveTo(57, 76, 46, 76, 39, 69);
-        ring.curveTo(32, 63, 31, 52, 38, 45);
-        ring.curveTo(44, 38, 54, 36, 62, 41);
-        ring.closePath();
-        graphics.setColor(new Color(0xFFD8B4));
-        graphics.fill(ring);
-        Path2D band = new Path2D.Float();
-        band.moveTo(27, 73);
-        band.curveTo(35, 61, 50, 48, 69, 38);
-        band.lineTo(76, 50);
-        band.curveTo(58, 59, 45, 70, 38, 82);
-        band.closePath();
-        graphics.setColor(new Color(0xFF896D));
-        graphics.fill(band);
-        graphics.fillOval(69, 18, 18, 18);
+        graphics.fillRoundRect(4, 4, 100, 100, 44, 44);
+        Path2D top = new Path2D.Float();
+        top.moveTo(20, 60); top.lineTo(36, 32); top.quadTo(39, 26, 46, 26);
+        top.lineTo(77, 26); top.lineTo(69, 40); top.lineTo(48, 40); top.lineTo(32, 68); top.closePath();
+        graphics.setColor(MINT);
+        graphics.fill(top);
+        Path2D bottom = new Path2D.Float();
+        bottom.moveTo(88, 48); bottom.lineTo(72, 76); bottom.quadTo(69, 82, 62, 82);
+        bottom.lineTo(31, 82); bottom.lineTo(39, 68); bottom.lineTo(60, 68); bottom.lineTo(76, 40); bottom.closePath();
+        graphics.setColor(new Color(0x78AFFF));
+        graphics.fill(bottom);
         graphics.dispose();
         return icon;
     }
@@ -736,6 +805,179 @@ public final class Main {
                 offset += images[i].length;
             }
             for (byte[] png : images) output.write(png);
+        }
+    }
+
+    private static boolean motionEnabled() {
+        return !Boolean.FALSE.equals(Toolkit.getDefaultToolkit().getDesktopProperty("win.menu.animation"))
+                && !Boolean.TRUE.equals(Toolkit.getDefaultToolkit().getDesktopProperty("win.highContrast.on"));
+    }
+
+    private static final class TabStrip extends JPanel {
+        private int target;
+        private float start, position;
+        private long since;
+        private final Timer motion = new Timer(16, event -> {
+            float t = Math.min(1f, (System.nanoTime() - since) / 215_000_000f);
+            float left = 1 - t;
+            position = target + (start - target) * left * left * left;
+            if (t >= 1) ((Timer) event.getSource()).stop();
+            repaint();
+        });
+
+        TabStrip() { super(new GridLayout(1, 3, 4, 0)); setOpaque(false); }
+
+        void select(int index, boolean animate) {
+            target = index;
+            motion.stop();
+            if (animate && isShowing() && motionEnabled()) {
+                start = position;
+                since = System.nanoTime();
+                motion.start();
+            } else position = index;
+            repaint();
+        }
+
+        @Override protected void paintChildren(Graphics source) {
+            super.paintChildren(source);
+            int first = (int) position;
+            if (first < 0 || first >= getComponentCount()) return;
+            Component a = getComponent(first), b = getComponent(Math.min(first + 1, getComponentCount() - 1));
+            int x = a.getX() + Math.round((b.getX() - a.getX()) * (position - first));
+            Graphics2D g = (Graphics2D) source.create();
+            g.setColor(ACCENT);
+            g.fillRoundRect(x + 10, getHeight() - 3, a.getWidth() - 20, 3, 3, 3);
+            g.dispose();
+        }
+    }
+
+    private static final class FieldCombo<E> extends JComboBox<E> {
+        FieldCombo() { super(); }
+        FieldCombo(E[] values) { super(values); }
+
+        @Override public void updateUI() {
+            setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
+                @Override protected JButton createArrowButton() {
+                    JButton arrow = new JButton("▾");
+                    arrow.setBorder(BorderFactory.createEmptyBorder(1, 6, 2, 8));
+                    arrow.setContentAreaFilled(false);
+                    arrow.setForeground(ACCENT);
+                    arrow.setFocusable(false);
+                    return arrow;
+                }
+            });
+            setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            setBackground(WELL);
+            setForeground(TEXT);
+            setBorder(BorderFactory.createEmptyBorder(4, 5, 4, 2));
+            setRenderer(new DefaultListCellRenderer() {
+                @Override public Component getListCellRendererComponent(JList<?> list, Object value, int i, boolean selected, boolean focus) {
+                    JLabel item = (JLabel) super.getListCellRendererComponent(list, value, i, selected, focus);
+                    boolean highlight = selected && (i >= 0 || FieldCombo.this.hasFocus());
+                    item.setBackground(highlight ? LIGHT[6] : WELL);
+                    item.setForeground(highlight ? ON_INK : TEXT);
+                    item.setBorder(BorderFactory.createEmptyBorder(4, 5, 4, 5));
+                    return item;
+                }
+            });
+        }
+    }
+
+    private static final class WrapText extends JTextArea {
+        WrapText(String text) {
+            super(text);
+            setEditable(false);
+            setFocusable(false);
+            setOpaque(false);
+            setBorder(null);
+            setLineWrap(true);
+            setWrapStyleWord(true);
+            setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            setForeground(MUTED);
+        }
+
+        @Override public Dimension getPreferredSize() {
+            // BoxLayout asks for the height before the two columns receive their final widths.
+            int width = getWidth() > 0 ? getWidth() : 214;
+            var view = getUI().getRootView(this);
+            view.setSize(width, Integer.MAX_VALUE);
+            return new Dimension(width, (int) Math.ceil(view.getPreferredSpan(javax.swing.text.View.Y_AXIS)) + 3);
+        }
+
+        @Override public void setBounds(int x, int y, int width, int height) {
+            boolean resized = width != getWidth();
+            super.setBounds(x, y, width, height);
+            if (resized) revalidate();
+        }
+
+        @Override public Dimension getMaximumSize() {
+            return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+        }
+    }
+
+    private static final class ScrollColumn extends JPanel implements Scrollable {
+        ScrollColumn() { super(new BorderLayout()); }
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+        @Override public int getScrollableUnitIncrement(Rectangle r, int orientation, int direction) { return 20; }
+        @Override public int getScrollableBlockIncrement(Rectangle r, int orientation, int direction) { return Math.max(20, r.height - 20); }
+    }
+
+    private static final class StudioBanner extends JPanel {
+        StudioBanner() { setOpaque(false); }
+        @Override protected void paintComponent(Graphics source) {
+            Graphics2D g = (Graphics2D) source.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setPaint(new GradientPaint(0, getHeight(), INK, getWidth(), 0, new Color(0x235CA6)));
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), 22, 22);
+            g.dispose();
+            super.paintComponent(source);
+        }
+    }
+
+    private static final class DeviceImage extends JComponent {
+        private final BufferedImage devices;
+        DeviceImage() {
+            BufferedImage loaded = null;
+            try (var stream = Main.class.getResourceAsStream("/studio_devices.png")) {
+                if (stream != null) loaded = javax.imageio.ImageIO.read(stream);
+            } catch (IOException ignored) { }
+            devices = loaded;
+            setPreferredSize(new Dimension(238, 146));
+        }
+        @Override protected void paintComponent(Graphics source) {
+            if (devices == null) return;
+            float scale = Math.min(getWidth() / (float) devices.getWidth(), getHeight() / (float) devices.getHeight());
+            int width = Math.round(devices.getWidth() * scale);
+            int height = Math.round(devices.getHeight() * scale);
+            Graphics2D g = (Graphics2D) source.create();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(devices, (getWidth() - width) / 2, (getHeight() - height) / 2, width, height, null);
+            g.dispose();
+        }
+    }
+
+    private static final class MonitorMap extends JComponent {
+        private boolean available;
+        MonitorMap() { setPreferredSize(new Dimension(200, 95)); }
+        void available(boolean value) { if (value != available) { available = value; repaint(); } }
+        @Override protected void paintComponent(Graphics source) {
+            Graphics2D g = (Graphics2D) source.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            float scale = Math.min(getWidth() / 250f, getHeight() / 100f);
+            g.translate((getWidth() - 250 * scale) / 2, (getHeight() - 100 * scale) / 2);
+            g.scale(scale, scale);
+            g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.setColor(new Color(0xB1DAFF));
+            g.drawRoundRect(4, 10, 96, 55, 6, 6); g.drawLine(52, 65, 52, 74); g.drawLine(37, 75, 67, 75);
+            g.setColor(available ? MINT : new Color(0x8EA7C1));
+            g.drawLine(109, 42, 151, 42); g.drawLine(144, 36, 151, 42); g.drawLine(144, 48, 151, 42);
+            g.drawRoundRect(161, 20, 83, 48, 6, 6); g.drawLine(194, 63, 210, 63);
+            g.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            g.setColor(ON_INK);
+            g.drawString("Windows", 28, 94); g.drawString("Android", 182, 94);
+            g.dispose();
         }
     }
 
@@ -771,7 +1013,7 @@ public final class Main {
         }
 
         void enter() {
-            if (Boolean.FALSE.equals(Toolkit.getDefaultToolkit().getDesktopProperty("win.menu.animation"))) return;
+            if (!motionEnabled()) { motion.stop(); progress = 1f; repaint(); return; }
             started = System.nanoTime();
             progress = 0f;
             motion.restart();
@@ -786,7 +1028,7 @@ public final class Main {
             Graphics2D graphics = (Graphics2D) source.create();
             float remaining = 1f - progress;
             graphics.setComposite(AlphaComposite.SrcOver.derive(1f - .8f * remaining * remaining));
-            graphics.translate(Math.round(12 * remaining * remaining), 0);
+            graphics.translate(0, Math.round(9 * remaining * remaining));
             super.paintChildren(graphics);
             graphics.dispose();
         }
@@ -799,7 +1041,7 @@ public final class Main {
             Graphics2D g = (Graphics2D) source.create();
             g.translate(x, y);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(PEACH);
+            g.setColor(target.getForeground());
             g.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             switch (section) {
                 case 0 -> {
@@ -808,8 +1050,13 @@ public final class Main {
                 }
                 case 1 -> {
                     g.drawRoundRect(1, 3, 16, 12, 3, 3); g.drawLine(4, 18, 10, 18);
-                    g.setColor(INK); g.fillRoundRect(13, 9, 8, 12, 2, 2);
-                    g.setColor(PEACH); g.drawRoundRect(13, 9, 8, 12, 2, 2);
+                    g.setColor(WELL); g.fillRoundRect(13, 9, 8, 12, 2, 2);
+                    g.setColor(target.getForeground()); g.drawRoundRect(13, 9, 8, 12, 2, 2);
+                }
+                case 3 -> {
+                    g.drawRoundRect(6, 7, 10, 7, 3, 3);
+                    g.drawRect(8, 3, 6, 4);
+                    g.drawArc(4, 10, 7, 10, 270, 90);
                 }
                 default -> {
                     g.drawOval(2, 2, 18, 18); g.drawOval(7, 2, 8, 18); g.drawLine(3, 11, 19, 11);
@@ -821,16 +1068,16 @@ public final class Main {
 
     private static final class StyledButton extends JButton {
         private final boolean accent;
-        private final boolean sidebar;
+        private final boolean tab;
         private final Timer motion;
         private float hover;
 
-        StyledButton(String text, boolean accent, boolean sidebar) {
+        StyledButton(String text, boolean accent, boolean tab) {
             super(text);
             this.accent = accent;
-            this.sidebar = sidebar;
+            this.tab = tab;
             setFont(new Font("Segoe UI", Font.BOLD, 13));
-            setForeground(sidebar || accent ? ON_INK : TEXT);
+            setForeground(accent ? ON_INK : TEXT);
             setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
             setContentAreaFilled(false);
             setFocusPainted(false);
@@ -841,21 +1088,24 @@ public final class Main {
                 if (Math.abs(destination - hover) < .02f) { hover = destination; ((Timer) event.getSource()).stop(); }
                 repaint();
             });
-            getModel().addChangeListener(event -> motion.start());
+            getModel().addChangeListener(event -> {
+                float target = getModel().isRollover() && isEnabled() ? 1f : 0f;
+                if (!motionEnabled()) { hover = target; repaint(); }
+                else if (isShowing() && target != hover) motion.start();
+            });
         }
 
         @Override protected void paintComponent(Graphics source) {
             Graphics2D graphics = (Graphics2D) source.create();
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color base = sidebar ? isSelected() ? LIGHT[6] : INK : accent && isEnabled() ? LIGHT[6] : WELL;
-            int light = (int) (18 * hover) - (getModel().isPressed() ? 13 : 0);
+            Color base = tab ? (getModel().isRollover() ? WELL : CARD) : accent && isEnabled() ? LIGHT[6] : WELL;
+            int light = (int) (10 * hover) - (getModel().isPressed() ? 15 : 0);
             graphics.setColor(new Color(channel(base.getRed(), light), channel(base.getGreen(), light), channel(base.getBlue(), light)));
-            graphics.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 11, 11);
-            graphics.setColor(isFocusOwner() ? (sidebar ? PEACH : TEXT) : BORDER);
-            if ((!accent && !sidebar) || isFocusOwner()) graphics.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 11, 11);
-            if (sidebar && isSelected()) {
-                graphics.setColor(PEACH);
-                graphics.fillRoundRect(3, 9, 3, getHeight() - 18, 3, 3);
+            graphics.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+            if (isFocusOwner()) {
+                graphics.setColor(accent ? ON_INK : ACCENT);
+                graphics.setStroke(new BasicStroke(2));
+                graphics.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 8, 8);
             }
             graphics.dispose();
             super.paintComponent(source);
